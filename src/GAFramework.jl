@@ -4,7 +4,7 @@ module GAFramework
 
 using JLD
 
-export GAModel, GACreature, ga!,
+export GAModel, GACreature, ga,
 fitness, genauxga, crossover, mutate, selection, randcreature,
 printfitness, savecreature,
 GAState,loadgastate,savegastate,

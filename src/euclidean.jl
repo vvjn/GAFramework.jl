@@ -1,15 +1,15 @@
 using StaticArrays
 
-export EuclideanModel, EuclideanCreature, getobjective
+export CoordinateModel, CoordinateCreature
 
 """
 # E.g.
 minimizes function
-    model = EuclideanModel(x -> abs(x[1] - 20.0), -200.0, 200.0)
+    model = CoordinateModel(x -> abs(x[1] - 20.0), -200.0, 200.0)
     state = GAState(model, ngen=500, npop=6_000, elite_fraction=0.1,
                        crossover_rate=0.9, mutation_rate=0.9,
                        print_fitness_iter=1)
-    ga!(state)
+    ga(state)
 
     type T has to have properties
         y-x :: T     
@@ -21,57 +21,57 @@ Since we are using StaticArrays here, this would work well (speed-wise)
 for input arrays of size less than around 12 according to
 the StaticArrays documentation    
 """
-immutable EuclideanModel{F,T} <: GAModel
+immutable CoordinateModel{F,T} <: GAModel
+    f::F
     xmin::T
     xmax::T
     xspan::T # xmax-xmin
     clamp::Bool
 end
-function EuclideanModel(F,xmin,xmax,clamp::Bool=true)
+function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
     D = length(xmin)
     ymin = SVector{D}(xmin)
     ymax = SVector{D}(xmax)
     yspan = ymax .- ymin
-    # check that F(xmin), F(xmax) can be converted to Float64 (fitness value)
-    # and that F(yspan), F(xmin), and F(xmax) has sane values
-    Float64(F(xmin))
-    Float64(F(xmax))
+    # check that F(ymin), F(ymax) can be converted to Float64 (fitness value)
+    Float64(f(ymin))
+    Float64(f(ymax))
+    # and that F(yspan), F(ymin), and F(ymax) has sane values maybe
     #z1!=Inf && z2!=Inf && !isnan(z1) && !isnan(z2) ||
     #    error("F(xmin) or F(xmax) objective function is either NaN or Inf")
     all(yspan .>= zero(eltype(yspan))) || error("ymax[i] > ymin[i] for some i")
-    EuclideanModel{F,typeof(yspan)}(ymin,ymax,yspan,clamp)
+    CoordinateModel{F,typeof(yspan)}(f,ymin,ymax,yspan,clamp)
 end
-getobjective(::EuclideanModel{F,T}) where {F,T} = F
 
-immutable EuclideanCreature{T} <: GACreature
+immutable CoordinateCreature{T} <: GACreature
     value :: T
     objvalue :: Float64
 end
-EuclideanCreature(value::T, m::EuclideanModel{F,T}) where {F,T} =
-    EuclideanCreature{T}(value, F(value))
+CoordinateCreature(value::T, m::CoordinateModel{F,T}) where {F,T} =
+    CoordinateCreature{T}(value, m.f(value))
 
-fitness(x::EuclideanCreature{T}) where {T} = -x.objvalue
+fitness(x::CoordinateCreature{T}) where {T} = -x.objvalue
 
-randcreature(m::EuclideanModel{F,T}, aux, rng) where {F,T} =
-    EuclideanCreature(m.xmin .+ m.xspan .* rand(rng,T), m)
+randcreature(m::CoordinateModel{F,T}, aux, rng) where {F,T} =
+    CoordinateCreature(m.xmin .+ m.xspan .* rand(rng,T), m)
 
-crossover(x::EuclideanCreature{T}, y::EuclideanCreature{T},
-          m::EuclideanModel{F,T}, aux,
-          z::EuclideanCreature{T}, rng) where {F,T} =
-              EuclideanCreature(0.5 .* (x.value.+y.value), m)
+crossover(x::CoordinateCreature{T}, y::CoordinateCreature{T},
+          m::CoordinateModel{F,T}, aux,
+          z::CoordinateCreature{T}, rng) where {F,T} =
+              CoordinateCreature(0.5 .* (x.value.+y.value), m)
 
-function mutate(x::EuclideanCreature{T}, m::EuclideanModel{F,T},
+function mutate(x::CoordinateCreature{T}, m::CoordinateModel{F,T},
                 aux, rng) where {F,T}
     yvalue = x.value .+ 0.25 .* m.xspan .* randn(rng,T)
     if m.clamp
         yvalue = max.(yvalue, m.xmin)
         yvalue = min.(yvalue, m.xmax)
     end
-    EuclideanCreature(yvalue, m)
+    CoordinateCreature(yvalue, m)
 end
 
-selection(pop::Vector{<:EuclideanCreature{T}}, n::Integer, rng) where {T} =
+selection(pop::Vector{<:CoordinateCreature{T}}, n::Integer, rng) where {T} =
     selection(TournamentSelection(), pop, n, rng)
 
-printfitness(curgen::Integer, x::EuclideanCreature{T}) where {T} =
+printfitness(curgen::Integer, x::CoordinateCreature{T}) where {T} =
     println("curgen: $curgen value: $(x.value) obj. value: $(x.objvalue)")

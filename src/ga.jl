@@ -58,7 +58,7 @@ end
 
 """
        Saves ga state to file
-       Doesn't support GAModels or GACreatures containing functions (e.g. EuclideanModel)
+       Doesn't support GAModels or GACreatures containing functions (e.g. CoordinateModel)
        since JLD doesn't support saving functions
 """       
 function savegastate(file_name_prefix::AbstractString, curgen::Integer, state::GAState)
@@ -73,8 +73,8 @@ function loadgastate(filename::AbstractString)
 end
 
 """
-    ga! function
-        x create state using state = GAState(...) and run using ga!(state)
+    ga function
+        x create state using state = GAState(...) and run using ga(state)
         - this allows us to restart from a saved state
         x does crossover & mutation
         - elite part of population is kept for next generation
@@ -82,11 +82,11 @@ end
             - children created using crossover replaces only non-elite part of population
             - mutation mutates only non-elite part of population
             x saves state every save_state_iter iterations to file
-            - restart using state = loadgastate(filename) & ga!(state)
+            - restart using state = loadgastate(filename) & ga(state)
             x outputs creature every save_creature_iter iterations to file
             x prints fitness value every print_fitness_iter iterations to screen
             """
-function ga!(state::GAState)
+function ga(state::GAState)
     # load from state
     model = state.model
     pop = state.pop
@@ -120,36 +120,32 @@ function ga!(state::GAState)
     # 5. sort population
     for curgen = curgen+1:ngen
         # crossover. uses multi-threading when available
-        if crossover_rate > 0
-            parents = selection(pop, nchildren, rngs[1])
-            Threads.@threads for i = 1:nchildren
-                ip = elite_cf+i
-                if rand() < crossover_rate
-                    threadid = Threads.threadid()
-                    p1,p2 = parents[i]
-                    children[i] = crossover(pop[p1], pop[p2], model,
-                                            aux[threadid], children[i],
-                                            rngs[threadid])
-                else
-                    # if not crossing then prepare to just keep pop[ip]
-                    # we'll be swapping this back later
-                    children[i], pop[ip] = pop[ip], children[i]
-                end
-            end
-            # swaps space between non-elites and children
-            # non-elites will get overwritten in the next generation
-            for i = 1:nchildren
-                ip = elite_cf+i
+        parents = selection(pop, nchildren, rngs[1])
+        Threads.@threads for i = 1:nchildren
+            threadid = Threads.threadid()
+            ip = elite_cf+i
+            if rand(rngs[threadid]) < crossover_rate
+                p1,p2 = parents[i]
+                children[i] = crossover(pop[p1], pop[p2], model,
+                                        aux[threadid], children[i],
+                                        rngs[threadid])
+            else
+                # if not crossing then prepare to just keep pop[ip]
+                # we'll be swapping this back later
                 children[i], pop[ip] = pop[ip], children[i]
             end
         end
+        # swaps space between non-elites and children
+        # non-elites will get overwritten in the next generation
+        for i = 1:nchildren
+            ip = elite_cf+i
+            children[i], pop[ip] = pop[ip], children[i]
+        end
         # mutate
-        if mutation_rate > 0
-            Threads.@threads for ip = elite_cf+1:npop
-                if rand() < mutation_rate
-                    threadid = Threads.threadid()
-                    pop[ip] = mutate(pop[ip], model, aux[threadid], rngs[threadid])
-                end
+        Threads.@threads for ip = elite_cf+1:npop
+            threadid = Threads.threadid()
+            if rand(rngs[threadid]) < mutation_rate
+                pop[ip] = mutate(pop[ip], model, aux[threadid], rngs[threadid])
             end
         end
         sort!(pop,by=fitness,rev=true)

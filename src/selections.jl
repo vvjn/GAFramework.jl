@@ -5,15 +5,11 @@ function selection(::RouletteWheelSelection,
     wmin,wmax = extrema(fitness(c) for c in pop)
     weight = wmax - wmin
     function stochasticpick()
-        #iter = 0
         while true
             i = rand(rng,1:length(pop))
-            if weight * rand(rng) < fitness(pop[i]) - wmin
-                #println("stochastic pick: $n $(iter)")
+            if wmin + weight * rand(rng,typeof(weight)) <= fitness(pop[i])
                 return i
             end
-            #iter += 1
-            #iter > length(pop) || error("infinite loop in selection")
         end
     end
     parents = Vector{Tuple{Int,Int}}(n)
