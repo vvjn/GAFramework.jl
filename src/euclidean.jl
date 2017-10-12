@@ -34,8 +34,8 @@ function EuclideanModel(F,xmin,xmax,clamp::Bool=true)
     yspan = ymax .- ymin
     # check that F(xmin), F(xmax) can be converted to Float64 (fitness value)
     # and that F(yspan), F(xmin), and F(xmax) has sane values
-    z1 = F(xmin)
-    z2 = F(xmax)
+    Float64(F(xmin))
+    Float64(F(xmax))
     #z1!=Inf && z2!=Inf && !isnan(z1) && !isnan(z2) ||
     #    error("F(xmin) or F(xmax) objective function is either NaN or Inf")
     all(yspan .>= zero(eltype(yspan))) || error("ymax[i] > ymin[i] for some i")

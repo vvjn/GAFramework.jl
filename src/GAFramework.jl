@@ -58,13 +58,13 @@ genauxga(model::GAModel) = nothing
     y = randcreature(model,aux)
     z = randcreature(model,aux)
     child = crossover(x,y,model,aux,z,rng)
-    """
+"""
 crossover(x::GACreature, y::GACreature, model::GAModel,
           aux, z::GACreature, rng) = nothing
 
 """
     Mutates a incoming creature and outputs mutated creature
-    """
+"""
 mutate(creature::GACreature, model::GAModel, aux, rng) = creature
 
 """
@@ -73,7 +73,7 @@ mutate(creature::GACreature, model::GAModel, aux, rng) = creature
     Generate a vector of n tuples (i,j) where i and j are
     indices into pop, and where pop[i] and pop[j] are the
     selected parents.    
-    """    
+"""    
 selection(pop::Vector{<:GACreature}, n::Integer, rng) =
     selection(TournamentSelection(), pop, n, rng)
 
@@ -100,5 +100,6 @@ savecreature(file_name_prefix::AbstractString, curgen::Integer,
 
 include("ga.jl")
 include("euclidean.jl")
+include("selections.jl")
 
 end

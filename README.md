@@ -1,15 +1,11 @@
 # GAFramework: a genetic algorithm framework with multi-threading
 
-[![Build Status](https://travis-ci.org/vvjn/GAFramework.jl.svg?branch=master)](https://travis-ci.org/vvjn/GAFramework.jl)
+[![Build Status](https://travis-ci.org/vvjn/GAFramework.jl.svg?branch=master)](https://travis-ci.org/vvjn/GAFramework.jl) [![Coverage Status](https://coveralls.io/repos/vvjn/GAFramework.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/vvjn/GAFramework.jl?branch=master) [![codecov.io](http://codecov.io/github/vvjn/GAFramework.jl/coverage.svg?branch=master)](http://codecov.io/github/vvjn/GAFramework.jl?branch=master)
 
-[![Coverage Status](https://coveralls.io/repos/vvjn/GAFramework.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/vvjn/GAFramework.jl?branch=master)
-
-[![codecov.io](http://codecov.io/github/vvjn/GAFramework.jl/coverage.svg?branch=master)](http://codecov.io/github/vvjn/GAFramework.jl?branch=master)
-
-
-GAFramework is a framework for writing genetic algorithms that is very
-customizable. It also supports multi-threading, calculating crossovers
-and fitness values in parallel.
+GAFramework is a framework for writing genetic algorithms in Julia that is very
+customizable. It supports multi-threading, which calculates crossovers
+and fitness values in parallel. It supports restarting the GA after
+running it.
 
 ## Installation
 
@@ -17,7 +13,7 @@ and fitness values in parallel.
 
 This requires the JLD and StaticArrays packages.
 
-## Creating a genetic algorithm
+## Implementing a GA for a specific problem
 
 To create a GA for a specific problem, we need to create concrete
 sub-types of the abstract types `GAModel` and `GACreature`, and then
@@ -40,7 +36,7 @@ using StaticArrays
 
 Here, we create a sub-type of `GAModel`, which contains the corners of
 the rectangle (`xmin` and `xmax`) and the span of the rectangle
-(`xspan`). We also add the `clamp` field: if `clamp = tru` then we
+(`xspan`). We also add the `clamp` field: if `clamp = true` then we
 will clamp mutated points back into the rectangle, so that our
 solutions will be inside the rectangle; otherwise, our solutions will
 not restricted to the rectangle. We store the function `F` inside the
@@ -152,18 +148,32 @@ savecreature(file_name_prefix::AbstractString, curgen::Integer,
     save("$(file_name_prefix)_creature_$(curgen).jld", "creature", creature)
 ```
 
-That takes care of how to define our problem using `GAFramework`. Now,
-we run the GA.
+## Running the GA
+
+That takes care of how to implement our problem using
+`GAFramework`. Now, we define our problem by creating a
+`EuclideanModel`.
+
+For fun, we want to minimize the function `<x, sin(1/x)> in 2D
+Euclidean space over the `[-1,1]^2` rectangle.
+
+```julia
+model = EuclideanModel(x -> any(x.==0) ? 0.0 : dot(x, sin.(1./x)),
+                         [-1.,-1.], [1.,1.])
+```
+
+Or, we want to minimize the function `exp(|x - 0.5|_1)` in
+5-dimensional Euclidean space over the `[-1,1]^5` rectangle.
 
 ```julia
 using StaticArrays
 
-model = EuclideanModel(x -> exp(norm(x-SVector(0.5,0.5,0.5,0.5,0.5))),
+model = EuclideanModel(x -> exp(norm(x-SVector(0.5,0.5,0.5,0.5,0.5),1)),
                          [-1.,-1.,-1.,-1.,-1], # minimum corner
                          [1.,1.,1.,1.,1]) # maximum corner in rectangle
 ```
 
-This creates the GA state, with population size 6000, maximum number
+Here, we create the GA state, with population size 6000, maximum number
 of generations 500, fraction of elite creatures 0.1, crossover rate
 0.9, and mutation rate 0.9. This also prints the objective value every
 iteration. Primarily, this generates the population.
@@ -187,7 +197,7 @@ ga!(state)
 After we finish a GA run using `ga!(state)`, and we decide that we
 want to continue optimizing for a few more generations, we can do the
 following.  Here, we change maximum number of generations to 1000, and
-then restart the GA.
+then restart the GA, continuing on from where the GA stopped earlier.
 
 ```julia
 state.ngen = 1000
