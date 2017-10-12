@@ -168,13 +168,13 @@ model = CoordinateModel(x -> any(x.==0) ? 0.0 : dot(x, sin.(1./x)),
                          [-1.,-1.], [1.,1.])
 ```
 
-Or, we want to minimize the function `exp(|x - (0.25,0.25,0.5,0.5,0.5)|_1)` in
+Or, we want to minimize the function `|x - (0.25,0.25,0.5,0.5,0.5)|_1` in
 5-dimensional Euclidean space over the `[-1,1]^5` rectangle.
 
 ```julia
 using StaticArrays
 
-model = CoordinateModel(x -> exp(norm(x-SVector(0.25,0.25,0.5,0.5,0.5),1)),
+model = CoordinateModel(x -> norm(x-SVector(0.25,0.25,0.5,0.5,0.5),1),
                          [-1.,-1.,-1.,-1.,-1], # minimum corner
                          [1.,1.,1.,1.,1]) # maximum corner in rectangle
 ```
