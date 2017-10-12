@@ -126,9 +126,8 @@ function ga(state::GAState)
             ip = elite_cf+i
             if rand(rngs[threadid]) < crossover_rate
                 p1,p2 = parents[i]
-                children[i] = crossover(pop[p1], pop[p2], model,
-                                        aux[threadid], children[i],
-                                        rngs[threadid])
+                children[i] = crossover(children[i], pop[p1], pop[p2],
+                                        model, aux[threadid], rngs[threadid])
             else
                 # if not crossing then prepare to just keep pop[ip]
                 # we'll be swapping this back later

@@ -46,8 +46,7 @@ fitness(x::GACreature) = x.objvalue
 genauxga(model::GAModel) = nothing
 
 """
-    crossover(x::GACreature,y::GACreature,model::GAModel,
-    aux, z::GACreature, rng) :: GACreature
+    crossover(z::GACreature, x::GACreature,y::GACreature,model::GAModel, aux, rng) :: GACreature
 
     Crosses over x and y to create a child. Optionally use space in z as a
     scratch space or to create the child.
@@ -57,10 +56,9 @@ genauxga(model::GAModel) = nothing
     x = randcreature(model,aux)
     y = randcreature(model,aux)
     z = randcreature(model,aux)
-    child = crossover(x,y,model,aux,z,rng)
+    child = crossover(z,x,y,model,aux,rng)
 """
-crossover(x::GACreature, y::GACreature, model::GAModel,
-          aux, z::GACreature, rng) = nothing
+crossover(z::GACreature, x::GACreature, y::GACreature, model::GAModel, aux, rng) = nothing
 
 """
     Mutates a incoming creature and outputs mutated creature
@@ -99,7 +97,7 @@ savecreature(file_name_prefix::AbstractString, curgen::Integer,
     save("$(file_name_prefix)_creature_$(curgen).jld", "creature", creature)
 
 include("ga.jl")
-include("euclidean.jl")
+include("coordinate.jl")
 include("selections.jl")
 
 end

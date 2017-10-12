@@ -36,10 +36,10 @@ using StaticArrays
 
 Here, we create a sub-type of `GAModel`, which contains the function
 `f`, the corners of the rectangle (`xmin` and `xmax`), and the span of
-the rectangle (`xspan`). It also contains the `clamp` field: if `clamp =
-true` then we will clamp mutated points back into the rectangle, so
-that our solutions will be inside the rectangle; otherwise, our
-solutions will not restricted to the rectangle.
+the rectangle (`xspan`). It also contains the `clamp` field: if `clamp
+= true` then we will clamp mutated or crossovered points back into the
+rectangle, so that our solutions will be inside the rectangle;
+otherwise, our solutions will not restricted to the rectangle.
 
 ```julia
 immutable CoordinateModel{F,T} <: GAModel
@@ -50,7 +50,7 @@ immutable CoordinateModel{F,T} <: GAModel
     clamp::Bool
 end
 
-function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true)
+function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
     D = length(xmin)
     ymin = SVector{D}(xmin)
     ymax = SVector{D}(xmax)
@@ -91,7 +91,7 @@ memory-safe (due to multi-threading) auxiliary scratch space. In this
 example, we do not need any scratch space.
 
 ```julia
-randcreature(m::CoordinateModel, aux, rng) =
+randcreature(m::CoordinateModel{F,T}, aux, rng) where {F,T} =
     CoordinateCreature(m.xmin .+ m.xspan .* rand(rng,T), m)
 ```
 
@@ -102,9 +102,8 @@ not do this since we are using `SVector`s but it can be done if we use
 `Vector`s.
 
 ```julia
-crossover(x::CoordinateCreature{T}, y::CoordinateCreature{T},
-          m::CoordinateModel{F,T}, aux,
-          z::CoordinateCreature{T}, rng) where {F,T} =
+crossover(z::CoordinateCreature{T}, x::CoordinateCreature{T}, y::CoordinateCreature{T},
+          m::CoordinateModel{F,T}, aux, rng) where {F,T} =
               CoordinateCreature(0.5 .* (x.value.+y.value), m)
 ```
 
