@@ -72,7 +72,6 @@ function crossover(::SinglePointCrossover, z::CoordinateCreature{T}, x::Coordina
         zvec[1:i] = y.value[1:i]
     end
     zvalue = SVector{N}(zvec)
-    m.clamp && (zvalue = clamp.(zvalue, m.xmin, m.xmax))
     CoordinateCreature(zvalue, m)
 end
 
@@ -90,7 +89,6 @@ function crossover(::TwoPointCrossover, z::CoordinateCreature{T}, x::CoordinateC
         zvec[i+1:j] = z.value[i+1:j]
     end
     zvalue = SVector{N}(zvec)
-    m.clamp && (zvalue = clamp.(zvalue, m.xmin, m.xmax))
     CoordinateCreature(zvalue, m)
 end
 
@@ -100,7 +98,7 @@ function crossover(z::CoordinateCreature{T}, x::CoordinateCreature{T}, y::Coordi
 end
 
 function mutate(x::CoordinateCreature{T}, m::CoordinateModel{F,T}, aux, rng) where {F,T}
-    yvalue = x.value .+ 0.25 .* m.xspan .* randn(rng,T)
+    yvalue = x.value .+ 0.25 .* m.xspan .* (randn(rng,T) .- 0.5)
     m.clamp && (yvalue = clamp.(yvalue, m.xmin, m.xmax))
     CoordinateCreature(yvalue, m)
 end

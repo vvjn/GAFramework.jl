@@ -9,9 +9,9 @@ running it.
 
 ## Installation
 
-`Pkg.clone("https://github.com/vvjn/GAFramework.jl")`
+`Pkg.clone("https://github.com/vvjn/GAFramework.jl")` or `Pkg.add("GAFramework")`
 
-This requires the JLD and StaticArrays packages.
+This package requires the JLD and StaticArrays packages.
 
 ## Implementing a GA for a specific problem
 
@@ -81,7 +81,7 @@ negative of the objective value.
 fitness(x::CoordinateCreature) = -x.objvalue
 ```
 
-This creates a `CoordinateCreature` object when given
+The following creates a `CoordinateCreature` object when given
 `CoordinateModel{F,T}`. Here, we create a random point drawn with uniform
 probability from the rectangle. Note: `aux` is used to store auxiliary
 scratch space in case we want to minimize memory
@@ -98,7 +98,7 @@ randcreature(m::CoordinateModel{F,T}, aux, rng) where {F,T} =
 This defines the crossover operator. Here, we define a crossover as
 the average of two points. Note: we can optionally re-use memory from
 the `z` object in order to create the new `CoordinateCreature`. We do
-not do this since we are using `SVector`s but it can be done if we use
+not do this here since we are using `SVector`s but it can be done if we use
 `Vector`s.
 
 ```julia
@@ -115,7 +115,7 @@ restrict points to be inside the rectangle.
 ```julia
 function mutate(x::CoordinateCreature{T}, m::CoordinateModel{F,T},
                 aux, rng) where {F,T}
-    yvalue = x.value .+ 0.25 .* m.xspan .* randn(rng,T)
+    yvalue = x.value .+ 0.25 .* m.xspan .* (randn(rng,T) .- 0.5)
     if m.clamp
         yvalue = max.(yvalue, m.xmin)
         yvalue = min.(yvalue, m.xmax)
@@ -138,8 +138,8 @@ printfitness(curgen::Integer, x::CoordinateCreature) =
     println("curgen: $curgen value: $(x.value) obj. value: $(x.objvalue)")
 ```
 
-This defines how to save our creature to file. `GAFramework` will save
-the best creature to file using this function.
+This defines how to save our creature to file. Whenever `GAFramework` saves
+the best creature to file while the GA is running, it will use this function.
 
 ```julia
 savecreature(file_name_prefix::AbstractString, curgen::Integer,
@@ -182,8 +182,8 @@ model = CoordinateModel(x -> norm(x-SVector(0.25,0.25,0.5,0.5,0.5),1),
 Here, we create the GA state, with population size 6000, maximum number
 of generations 500, fraction of elite creatures 0.1, crossover rate
 0.9, and mutation rate 0.9, printing the objective value every
-iteration. The `GAState` function generates the population and `state` contains
-all data required to start/restart a GA.
+iteration. The `state` variable contains
+all data required to start/restart a GA, including the population.
 
 ```julia
 state = GAState(model, ngen=500, npop=6_000, elite_fraction=0.1,
@@ -199,14 +199,14 @@ ga(state)
 
 `state.pop[1]` gives you the creature with the best fitness.
 
-`CoordinateModel` and `CoordinateCreature` are included `GAFramework`.
+`CoordinateModel` and `CoordinateCreature` are included in `GAFramework`.
 
 ## Restarting
 
 After we finish a GA run using `ga(state)`, and we decide that we
 want to continue optimizing for a few more generations, we can do the
 following.  Here, we change maximum number of generations to 1000, and
-then restart the GA, continuing on from where the GA stopped earlier.
+then restart the GA, which will continue on from where the GA stopped earlier.
 
 ```julia
 state.ngen = 1000
@@ -235,7 +235,7 @@ savecreature("minexp_6000", state.ngen, state.pop[1], model)
 
 This save the full GA state to file every 100 iterations using the
 following. Note: unfortunately, this doesn't work with
-`CoordinateModel{F,T}` since it contains the function `F`. It should
+`CoordinateModel{F,T}` since it contains the function `f :: F`. It should
 work for other types that doesn't contain functions.
 
 ```julia
