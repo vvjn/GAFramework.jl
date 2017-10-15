@@ -115,7 +115,7 @@ restrict points to be inside the rectangle.
 ```julia
 function mutate(x::CoordinateCreature{T}, m::CoordinateModel{F,T},
                 aux, rng) where {F,T}
-    yvalue = x.value .+ 0.25 .* m.xspan .* (randn(rng,T) .- 0.5)
+    yvalue = x.value .+ 0.25 .* m.xspan .* randn(rng,T)
     if m.clamp
         yvalue = max.(yvalue, m.xmin)
         yvalue = min.(yvalue, m.xmax)
