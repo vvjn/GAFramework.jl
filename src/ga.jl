@@ -1,3 +1,6 @@
+import Base.Threads: @threads
+macro threads(ex) :($(esc(ex))) end 
+
 """
    function to create a population for GAState or ga
 """
@@ -10,7 +13,7 @@ function initializepop(model::GAModel,npop::Integer,baserng,sort=true)
     pop1 = randcreature(model,aux[1],rngs[1])
     pop = Vector{typeof(pop1)}(npop)
     pop[1] = pop1
-    Threads.@threads for i = 2:npop
+    @threads for i = 2:npop
         threadid = Threads.threadid()
         pop[i] = randcreature(model,aux[threadid],rngs[threadid])
     end
@@ -25,8 +28,8 @@ type GAState
     curgen::Integer
     npop::Integer
     elite_fraction::Real
-    crossover_rate::Real
-    mutation_rate::Real
+    crossover_params
+    mutation_params
     print_fitness_iter::Real
     save_creature_iter::Real
     save_state_iter::Integer    
@@ -37,8 +40,8 @@ function GAState(model::GAModel;
                  ngen=10,
                  npop=100,
                  elite_fraction=0.2,
-                 crossover_rate=0.9,
-                 mutation_rate=0.1,
+                 crossover_params=nothing,
+                 mutation_params=Dict(:rate=>0.1),
                  print_fitness_iter=1,
                  save_creature_iter=0,
                  save_state_iter=0,
@@ -47,8 +50,8 @@ function GAState(model::GAModel;
     pop,aux,rngs = initializepop(model, npop, baserng)
     return GAState(model,pop,ngen,0,npop,
                    elite_fraction,
-                   crossover_rate,
-                   mutation_rate,
+                   crossover_params,
+                   mutation_params,
                    print_fitness_iter,
                    save_creature_iter,
                    save_state_iter,
@@ -94,8 +97,8 @@ function ga(state::GAState)
     curgen = state.curgen
     npop = state.npop
     elite_fraction = state.elite_fraction
-    crossover_rate = state.crossover_rate
-    mutation_rate = state.mutation_rate
+    crossover_params = state.crossover_params
+    mutation_params = state.mutation_params
     print_fitness_iter = state.print_fitness_iter
     save_creature_iter = state.save_creature_iter
     save_state_iter = state.save_state_iter
@@ -103,11 +106,21 @@ function ga(state::GAState)
     baserng = state.baserng
 
     # keep elites for next generation. elite fraction cutoff index
-    elite_cf = Int(floor(elite_fraction*npop))
-    0 <= elite_cf <= npop || error("elite fraction")
-    nchildren = npop-elite_cf
+    nelites = Int(floor(elite_fraction*npop))
+    0 <= nelites <= npop || error("elite fraction")
+    nchildren = npop-nelites
 
-    println("Running genetic algorithm with\n population size $npop,\n generation number $ngen,\n elite fraction $elite_fraction,\n children created $nchildren,\n crossover rate $crossover_rate,\n mutation rate $mutation_rate,\n printing fitness every $print_fitness_iter iteration(s),\n saving creature to file every $save_state_iter iteration(s),\n saving state every $save_state_iter iteration(s),\n with file name prefix $file_name_prefix.")
+    println("Running genetic algorithm with
+            population size $npop,
+            generation number $ngen,
+            elite fraction $elite_fraction,
+            children created $nchildren,
+            crossover_params $crossover_params,
+            mutation_params $mutation_params,
+            printing fitness every $print_fitness_iter iteration(s),
+            saving creature to file every $save_state_iter iteration(s),
+            saving state every $save_state_iter iteration(s),
+            with file name prefix $file_name_prefix.")
 
     # initialization
     children,aux,rngs = initializepop(model, nchildren, baserng, false)
@@ -115,37 +128,30 @@ function ga(state::GAState)
     # main loop:
     # 1. select parents
     # 2. crossover parents & create children
-    # 3. replace non-elite population with children
-    # 4. mutate non-elite population
+    # 4. replace non-elites in current generation with children
+    # 3. mutate population
     # 5. sort population
     for curgen = curgen+1:ngen
         # crossover. uses multi-threading when available
         parents = selection(pop, nchildren, rngs[1])
-        Threads.@threads for i = 1:nchildren
+        @threads for i = 1:nchildren
             threadid = Threads.threadid()
-            ip = elite_cf+i
-            if rand(rngs[threadid]) < crossover_rate
-                p1,p2 = parents[i]
-                children[i] = crossover(children[i], pop[p1], pop[p2],
-                                        model, aux[threadid], rngs[threadid])
-            else
-                # if not crossing then prepare to just keep pop[ip]
-                # we'll be swapping this back later
-                children[i], pop[ip] = pop[ip], children[i]
-            end
+            p1,p2 = parents[i]
+            children[i] = crossover(children[i], pop[p1], pop[p2],
+                                    model, crossover_params, curgen,
+                                    aux[threadid], rngs[threadid])
         end
-        # swaps space between non-elites and children
-        # non-elites will get overwritten in the next generation
+        # moves children and elites to current pop
         for i = 1:nchildren
-            ip = elite_cf+i
-            children[i], pop[ip] = pop[ip], children[i]
+            ip = nelites+i
+            pop[ip], children[i] = children[i], pop[ip]
         end
-        # mutate
-        Threads.@threads for ip = elite_cf+1:npop
+        # mutate pop (including elites)
+        # range i from 2:npop if you want monotonocity
+        @threads for i = 1:npop
             threadid = Threads.threadid()
-            if rand(rngs[threadid]) < mutation_rate
-                pop[ip] = mutate(pop[ip], model, aux[threadid], rngs[threadid])
-            end
+            pop[i] = mutate(pop[i], model, mutation_params, curgen,
+                            aux[threadid], rngs[threadid])
         end
         sort!(pop,by=fitness,rev=true)
 
@@ -160,8 +166,8 @@ function ga(state::GAState)
         if save_state_iter>0 && mod(curgen,save_state_iter)==0
             state = GAState(model,pop,ngen,curgen,npop,
                             elite_fraction,
-                            crossover_rate,
-                            mutation_rate,
+                            crossover_params,
+                            mutation_params,
                             print_fitness_iter,
                             save_creature_iter,
                             save_state_iter,
