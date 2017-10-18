@@ -229,6 +229,32 @@ state.ngen = 200
 ga(state)
 ```
 
+## Replicability with respect to pseudo-randomness
+
+Although `GAFramework` uses pseudo-random numbers for many operations, we
+can replicate a GA run using the `baserng` option and by using only the random number
+generators provided by the functions to generate random numbers. Setting `baserng` to be an 
+object that is a sub-type of `AbstractRNG`
+will percolate it throughout the GA, allowing us to replicate a run. By default, `baserng` is
+set to `Base.GLOBAL_RNG`.
+
+```julia
+state1 = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
+                       mutation_params=Dict(:rate=>0.1),
+                       print_fitness_iter=10, baserng=MersenneTwister(12))
+best1 = ga(state1)
+
+state2 = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
+                       mutation_params=Dict(:rate=>0.1),
+                       print_fitness_iter=10, baserng=MersenneTwister(12))
+best2 = ga(state2)
+
+println(all([getfield(state1,x) == getfield(state2,x) for x in fieldnames(GAState)]))
+# true
+println(best1 == best2)
+# true
+```
+
 ## Saving creature to file
 
 We can save the creature to file every 10 iterations using the following.

@@ -1,5 +1,5 @@
 import Base.Threads: @threads
-macro threads(ex) :($(esc(ex))) end 
+#macro threads(ex) :($(esc(ex))) end 
 
 """
    function to create a population for GAState or ga
