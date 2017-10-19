@@ -11,7 +11,7 @@ running it.
 
 `Pkg.add("GAFramework")` or `Pkg.clone("https://github.com/vvjn/GAFramework.jl")`
 
-This requires the JLD and StaticArrays packages.
+This requires the JLD package.
 
 ## Implementing a GA for a specific problem
 
@@ -23,15 +23,12 @@ To demonstrate this, we create a GA for optimizing a function over a box in a
 Coordinate space, i.e., a function `f : R^n -> R`.
 
 First, we import the `GAFramework` module and import relevant
-functions. We represent a point as a static vector `SVector`, and
-so we also import the `StaticArrays` package.
+functions.
 
 ```julia
 using GAFramework
 import GAFramework: fitness, genauxga, crossover, mutate, selection,
 randcreature,printfitness, savecreature
-
-using StaticArrays
 ```
 
 Next, we create a sub-type of `GAModel`, which contains the function
@@ -51,11 +48,8 @@ immutable CoordinateModel{F,T} <: GAModel
 end
 
 function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
-    D = length(xmin)
-    ymin = SVector{D}(xmin)
-    ymax = SVector{D}(xmax)
-    yspan = ymax .- ymin
-    CoordinateModel{F,typeof(yspan)}(f,ymin,ymax,yspan,clamp)
+        xspan = xmax .- xmin
+    CoordinateModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
 end
 ```
 
@@ -98,19 +92,21 @@ space. In this example, we do not need any scratch space.
 
 ```julia
 randcreature(m::CoordinateModel{F,T}, aux, rng) where {F,T} =
-    CoordinateCreature(m.xmin .+ m.xspan .* rand(rng,T), m)
+    CoordinateCreature(m.xmin .+ m.xspan .* rand(rng,length(m.xspan)), m)
 ```
 
 The following defines the crossover operator. We define a crossover as
 the average of two points (not the greatest crossover operator). Note:
-we can optionally re-use memory from the `z` object in order to create
-the new `CoordinateCreature`. We do not do this since we are using
-`SVector`s but it can be done if we use `Vector`s, for example.
+we re-use memory from the `z` object when creating
+the new `CoordinateCreature`.
 
 ```julia
-crossover(z::CoordinateCreature{T}, x::CoordinateCreature{T}, y::CoordinateCreature{T},
-          m::CoordinateModel{F,T}, params, curgen, aux, rng) where {F,T} =
-              CoordinateCreature(0.5 .* (x.value + y.value), m)
+function crossover(z::CoordinateCreature{T}, x::CoordinateCreature{T},
+                   y::CoordinateCreature{T}, m::CoordinateModel{F,T},
+                   params, curgen, aux, rng) where {F,T}
+              z.value[:] = 0.5 .* (x.value .+ y.value)
+              CoordinateCreature(z.value, m)
+end              
 ```
 
 The following defines the mutation operator. We draw a vector from a
@@ -123,12 +119,11 @@ inside the box.
 function mutate(x::CoordinateCreature{T}, m::CoordinateModel{F,T},
                 params, curgen, aux, rng) where {F,T}
     if rand(rng) < params[:rate]            
-        yvalue = x.value .+ 0.01 .* m.xspan .* randn(rng,T)
+        x.value .+= 0.01 .* m.xspan .* randn(rng,length(x.value))
         if m.clamp
-            yvalue = max.(yvalue, m.xmin)
-            yvalue = min.(yvalue, m.xmax)
+            x.value .= clamp.(x.value, m.xmin, m.xmax)
         end
-        CoordinateCreature(yvalue, m)
+        CoordinateCreature(x.value, m)
     else
         x
     end
@@ -168,7 +163,7 @@ For fun, we want to minimize the function `x sin(1/x)` over the
 `[-1,1]` interval.
 
 ```julia
-model = CoordinateModel(x -> x[1]==0 ? 0.0 : x[1] * sin(1/x[1]), -1.0, 1.0)
+model = CoordinateModel(x -> x[1]==0 ? 0.0 : x[1] * sin(1/x[1]), [-1.0], [1.0])
 ```
 
 Or, we want to minimize the function `<x, sin(1/x)>` in 2D
@@ -183,9 +178,8 @@ Or, we want to minimize the function `|x - (0.25,0.25,0.5,0.5,0.5)|_1` in
 5-dimensional Euclidean space over the `[-1,1]^5` box.
 
 ```julia
-using StaticArrays
-
-model = CoordinateModel(x -> norm(x-SVector(0.25,0.25,0.5,0.5,0.5),1),
+x0 = [0.25,0.25,0.5,0.5,0.5]
+model = CoordinateModel(x -> norm(x-x0,1),
                          [-1.,-1.,-1.,-1.,-1], # minimum corner
                          [1.,1.,1.,1.,1]) # maximum corner in box
 ```
@@ -276,7 +270,7 @@ savecreature("minexp_6000", state.ngen, state.pop[1], model)
 
 This save the full GA state to file every 100 iterations using the
 following. Note: unfortunately, this doesn't work with
-`CoordinateModel{F,T}` since it contains the function `f::F`. It should
+`CoordinateModel{F,T}` since it contains the function `f::F` as a field. It should
 work for other types that do not contain functions.
 
 ```julia
@@ -286,8 +280,8 @@ state = GAState(m, ngen=100, npop=1000, elite_fraction=0.01,
 ```
 
 If something happens during the middle of running `ga(state)`, we can
-reload the state from file from the 200th iteration as follows, and
-then restart the GA.
+reload the state from file from the 100th generation as follows, and
+then restart the GA from the saved generation.
 
 ```julia
 state = loadgastate("minexp_6000_state_100.jld")
@@ -295,7 +289,7 @@ state = loadgastate("minexp_6000_state_100.jld")
 ga(state)
 ```
 
-We can also save the state using the following.
+We can also directly save the state using the following.
 
 ```julia
 savegastate("minexp_6000", state.ngen, state)

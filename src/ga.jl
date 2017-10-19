@@ -9,15 +9,19 @@ function initializepop(model::GAModel,npop::Integer,baserng,sort=true)
     nthreads = Threads.nthreads()
     rngs = randjump(baserng, nthreads)
     aux = map(i -> genauxga(model), 1:nthreads)
-    # initialize population
-    pop1 = randcreature(model,aux[1],rngs[1])
-    pop = Vector{typeof(pop1)}(npop)
-    pop[1] = pop1
-    @threads for i = 2:npop
-        threadid = Threads.threadid()
-        pop[i] = randcreature(model,aux[threadid],rngs[threadid])
+    if npop > 0
+        # initialize population
+        pop1 = randcreature(model,aux[1],rngs[1])
+        pop = Vector{typeof(pop1)}(npop)
+        pop[1] = pop1
+        @threads for i = 2:npop
+            threadid = Threads.threadid()
+            pop[i] = randcreature(model,aux[threadid],rngs[threadid])
+        end
+        sort && sort!(pop,by=fitness,rev=true)
+    else
+        pop = nothing
     end
-    sort && sort!(pop,by=fitness,rev=true)
     return pop,aux,rngs
 end
 
@@ -77,17 +81,18 @@ end
 
 """
     ga function
-        x create state using state = GAState(...) and run using ga(state)
-        - this allows us to restart from a saved state
-        x does crossover & mutation
-        - elite part of population is kept for next generation
-            - crossover selects from all creatures in population
-            - children created using crossover replaces only non-elite part of population
-            - mutation mutates only non-elite part of population
+    x in each generation, the following is done
+        - keep elites
+        - select parents from all creatures in population
+        - create children using crossover
+        - replace non-elites in population with children
+        - mutate all creatures (both elites and children) in population
+        - logging
             x saves state every save_state_iter iterations to file
-            - restart using state = loadgastate(filename) & ga(state)
+                - restart using state = loadgastate(filename) & ga(state)
             x outputs creature every save_creature_iter iterations to file
             x prints fitness value every print_fitness_iter iterations to screen
+        - go to next generation
             """
 function ga(state::GAState)
     # load from state
@@ -109,6 +114,9 @@ function ga(state::GAState)
     nelites = Int(floor(elite_fraction*npop))
     0 <= nelites <= npop || error("elite fraction")
     nchildren = npop-nelites
+    children = deepcopy(pop[nelites+1:end])
+    # initialize auxiliary space
+    _,aux,rngs = initializepop(model, 0, baserng)
 
     println("Running genetic algorithm with
             population size $npop,
@@ -121,9 +129,6 @@ function ga(state::GAState)
             saving creature to file every $save_state_iter iteration(s),
             saving state every $save_state_iter iteration(s),
             with file name prefix $file_name_prefix.")
-
-    # initialization
-    children,aux,rngs = initializepop(model, nchildren, baserng, false)
 
     # main loop:
     # 1. select parents
@@ -144,11 +149,12 @@ function ga(state::GAState)
         # moves children and elites to current pop
         for i = 1:nchildren
             ip = nelites+i
+            # swapping b/c GACreature instance may refer to other memory
             pop[ip], children[i] = children[i], pop[ip]
         end
-        # mutate pop (including elites)
-        # range i from 2:npop if you want monotonocity
-        @threads for i = 1:npop
+        # mutate pop (including elites, except the most elite creature,
+        # in order to preserve monotonocity wrt best fitness)
+        @threads for i = 2:npop
             threadid = Threads.threadid()
             pop[i] = mutate(pop[i], model, mutation_params, curgen,
                             aux[threadid], rngs[threadid])

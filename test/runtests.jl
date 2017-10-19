@@ -2,7 +2,7 @@ using GAFramework
 using Base.Test
 
 function test1()
-    model = CoordinateModel(x -> x[1]==0.0 ? 0.0 : x[1] * sin(1/x[1]), -1.0, 1.0)
+    model = CoordinateModel(x -> x[1]==0.0 ? 0.0 : x[1] * sin(1/x[1]), [-1.0], [1.0])
     state = GAState(model, ngen=50, npop=300, elite_fraction=0.01,
                     mutation_params=Dict(:rate=>0.1),
                     print_fitness_iter=10)    
@@ -14,7 +14,8 @@ function test1()
 end
 
 function test2()
-    model = CoordinateModel(x -> any(x.==0) ? 0.0 : dot(x, sin.(1./x)), -ones(15), ones(15))
+    model = CoordinateModel(x -> any(z -> z==0.0, x) ? 0.0 : dot(x, sin.(1./x)),
+                            -ones(Float64,15), ones(Float64,15))
     # do simulated annealing when mutating
     state = GAState(model, ngen=500, npop=300, elite_fraction=0.01,
                     mutation_params=Dict(:rate=>0.1,:sa_rate=>0.1,:k=>1,

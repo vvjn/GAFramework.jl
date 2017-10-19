@@ -42,7 +42,7 @@ ga(state)
 if false
     # The following doesn't work b/c JLD doesn't support types w/ functions
     # Minimizes |tan(x + 1000)|
-    m = CoordinateModel(x -> abs(tanh(x[1]+1000)), -2000., 2000.)
+    m = CoordinateModel(x -> abs(tanh(x[1]+1000)), [-2000.], [2000.])
     # Saves full state to file every 10 iterations 
     state = GAState(m, ngen=100, npop=3_000, elite_fraction=0.01,
                     mutation_params=Dict(:rate=>0.1), print_fitness_iter=10,
