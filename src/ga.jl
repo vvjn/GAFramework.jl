@@ -4,7 +4,8 @@ import Base.Threads: @threads
 """
    function to create a population for GAState or ga
 """
-function initializepop(model::GAModel,npop::Integer,baserng,sort=true)
+function initializepop(model::GAModel,npop::Integer,
+                       nelites::Integer, baserng,sort=true)
     # each thread gets its own auxiliary scratch space
     nthreads = Threads.nthreads()
     rngs = randjump(baserng, nthreads)
@@ -18,7 +19,10 @@ function initializepop(model::GAModel,npop::Integer,baserng,sort=true)
             threadid = Threads.threadid()
             pop[i] = randcreature(model,aux[threadid],rngs[threadid])
         end
-        sort && sort!(pop,by=fitness,rev=true)
+        if sort
+            sort!(pop,by=fitness,rev=true,
+                  alg=PartialQuickSort(max(1,nelites)))
+        end
     else
         pop = nothing
     end
@@ -43,7 +47,7 @@ end
 function GAState(model::GAModel;
                  ngen=10,
                  npop=100,
-                 elite_fraction=0.2,
+                 elite_fraction=0.01,
                  crossover_params=nothing,
                  mutation_params=Dict(:rate=>0.1),
                  print_fitness_iter=1,
@@ -51,7 +55,9 @@ function GAState(model::GAModel;
                  save_state_iter=0,
                  file_name_prefix="gamodel",
                  baserng=Base.GLOBAL_RNG)
-    pop,aux,rngs = initializepop(model, npop, baserng)
+    0 <= elite_fraction <= 1 || error("elite_fraction bounds")
+    nelites = Int(floor(elite_fraction*npop))
+    pop,aux,rngs = initializepop(model, npop, nelites, baserng)
     return GAState(model,pop,ngen,0,npop,
                    elite_fraction,
                    crossover_params,
@@ -82,7 +88,6 @@ end
 """
     ga function
     x in each generation, the following is done
-        - keep elites
         - select parents from all creatures in population
         - create children using crossover
         - replace non-elites in population with children
@@ -110,13 +115,11 @@ function ga(state::GAState)
     file_name_prefix = state.file_name_prefix
     baserng = state.baserng
 
-    # keep elites for next generation. elite fraction cutoff index
     nelites = Int(floor(elite_fraction*npop))
-    0 <= nelites <= npop || error("elite fraction")
     nchildren = npop-nelites
     children = deepcopy(pop[nelites+1:end])
     # initialize auxiliary space
-    _,aux,rngs = initializepop(model, 0, baserng)
+    _,aux,rngs = initializepop(model, 0, 0, baserng)
 
     println("Running genetic algorithm with
             population size $npop,
@@ -149,17 +152,17 @@ function ga(state::GAState)
         # moves children and elites to current pop
         for i = 1:nchildren
             ip = nelites+i
-            # swapping b/c GACreature instance may refer to other memory
+            # swapping instead of deepcopy-ing
             pop[ip], children[i] = children[i], pop[ip]
         end
-        # mutate pop (including elites, except the most elite creature,
+        # mutate pop (including elites; except for the most elite creature
         # in order to preserve monotonocity wrt best fitness)
         @threads for i = 2:npop
             threadid = Threads.threadid()
             pop[i] = mutate(pop[i], model, mutation_params, curgen,
                             aux[threadid], rngs[threadid])
         end
-        sort!(pop,by=fitness,rev=true)
+        sort!(pop,by=fitness,rev=true,alg=PartialQuickSort(max(1,nelites)))
 
         if print_fitness_iter>0 && mod(curgen,print_fitness_iter)==0
             printfitness(curgen, pop[1])

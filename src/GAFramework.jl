@@ -16,7 +16,7 @@ RouletteWheelSelection,TournamentSelection
     fitness (has default)
     genauxga  (has default)
     crossover (no default)
-    mutate (has default)
+    mutate (has identity function as default)
     selection (has default)
     randcreature (no default)
     printfitness (has default)
@@ -27,11 +27,11 @@ abstract type GAModel end
 
 """
 Fitness
-    fitness(x) is maximized by default
+    fitness(x) is maximized always
     To minimize x.objvalue, dispatch fitness(x) to -x.objvalue for your Creature
     Recommended to make this either x.objvalue to maximize
         or -x.objvalue to minimize
-    This is used only for selection
+    fitness(x) used for selecting the fittest creature, elites, and parents
 """
 fitness(x::GACreature) = x.objvalue
 
@@ -58,7 +58,8 @@ genauxga(model::GAModel) = nothing
     z = randcreature(model,aux)
     child = crossover(z,x,y,model,aux,rng)
 """
-crossover(z::GACreature, x::GACreature, y::GACreature, model::GAModel, aux, rng) = nothing
+crossover(z::GACreature, x::GACreature, y::GACreature, model::GAModel, aux, rng) =
+    error("crossover not implemented for $(typeof(z)) and $(typeof(model))")
 
 """
     Mutates a incoming creature and outputs mutated creature
@@ -81,7 +82,8 @@ selection(pop::Vector{<:GACreature}, n::Integer, rng) =
     Create a random instance of a GACreature, given a GAModel.
     There is always a GACreature associated with a GAModel    
     """    
-randcreature(model::GAModel,aux,rng) = nothing
+randcreature(model::GAModel,aux,rng) =
+    error("randcreature not implemented for $(typeof(model))")
 
 """
    Print fitness

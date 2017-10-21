@@ -2,10 +2,25 @@
 
 [![Build Status](https://travis-ci.org/vvjn/GAFramework.jl.svg?branch=master)](https://travis-ci.org/vvjn/GAFramework.jl) [![Coverage Status](https://coveralls.io/repos/vvjn/GAFramework.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/vvjn/GAFramework.jl?branch=master) [![codecov.io](http://codecov.io/github/vvjn/GAFramework.jl/coverage.svg?branch=master)](http://codecov.io/github/vvjn/GAFramework.jl?branch=master)
 
-GAFramework is a framework for writing genetic algorithms in Julia that is very
-customizable. It supports multi-threading, which calculates crossovers
-and fitness values in parallel. It supports restarting the GA after
-running it.
+GAFramework is a framework for writing genetic algorithms in Julia. It
+supports parallelism by calculating crossovers and fitness using
+Julia's multi-threading capabilities.
+
+Since GAFramework stores the entire state of your genetic algorithm in
+an object, it allows you to save the entire state to file. It allows
+you to continue running your GA after you load your state from file or
+after you stop at a generation.  It allows you to change parameters
+such as crossover/mutation parameters after you stop at a generation
+and then continue from where you stopped.
+
+GAFramework is replicable with respect to pseudo-randomness. So, if
+you specify a random number generator, GAFramework will fully
+replicate your GA run as long as the number of threads used is the
+same for both runs.
+
+GAFramework also contains a genetic algorithm implementation that
+"minimizes" any function `f : R^n -> R` over a box in a Coordinate
+space.
 
 ## Installation
 

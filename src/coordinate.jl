@@ -24,16 +24,17 @@ immutable CoordinateModel{F,T} <: GAModel
     clamp::Bool
 end
 function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
-    T = promote_type(eltype(xmin),eltype(xmax))
+    xmin,xmax = promote(xmin,xmax)
+    ET = eltype(xmin)
     N = length(xmin)
     xspan = xmax .- xmin
-    # check that F(ymin), F(ymax) can be converted to Float64 (fitness value)
-    Float64(f(xmin))
-    Float64(f(xmax))
-    # and that F(yspan), F(ymin), and F(ymax) has sane values maybe
+    # check that F(ymin), F(ymax) can be converted to Float64 without error
+    z1 = Float64(f(xmin))
+    z2 = Float64(f(xmax))
+    # and that f(yspan), f(ymin), and f(ymax) has sane values maybe
     # z1!=Inf && z2!=Inf && !isnan(z1) && !isnan(z2) ||
-    #    error("F(xmin) or F(xmax) objective function is either NaN or Inf")
-    all(xspan .>= zero(T)) || error("xmax[i] < xmin[i] for some i")
+    #    error("f(xmin) or f(xmax) objective function is either NaN or Inf")
+    all(xspan .>= zero(ET)) || error("xmax[i] < xmin[i] for some i")
     CoordinateModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
 end
 
@@ -105,7 +106,7 @@ end
 # Mutate over all dimensions
 function mutatenormal(temp::Real, x::CoordinateCreature{T},
                       model::CoordinateModel{F,T}, rng) where {F,T}
-    x.value .+= temp .* model.xspan .* randn(rng,T)
+    x.value .+= temp .* model.xspan .* randn(rng,length(x.value))
     model.clamp && (x.value .= clamp.(x.value, model.xmin, model.xmax))
     CoordinateCreature(x.value, model)
 end
