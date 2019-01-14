@@ -1,3 +1,5 @@
+using Random
+import Future
 import Base.Threads: @threads
 #macro threads(ex) :($(esc(ex))) end 
 
@@ -8,12 +10,14 @@ function initializepop(model::GAModel,npop::Integer,
                        nelites::Integer, baserng,sort=true)
     # each thread gets its own auxiliary scratch space
     nthreads = Threads.nthreads()
-    rngs = randjump(baserng, nthreads)
+    rngs = let m = MersenneTwister(1)
+                [m; accumulate(Future.randjump, fill(big(10)^20, nthreads-1), init=m)]
+            end;
     aux = map(i -> genauxga(model), 1:nthreads)
     if npop > 0
         # initialize population
         pop1 = randcreature(model,aux[1],rngs[1])
-        pop = Vector{typeof(pop1)}(npop)
+        pop = Vector{typeof(pop1)}(undef, npop)
         pop[1] = pop1
         @threads for i = 2:npop
             threadid = Threads.threadid()
@@ -29,7 +33,7 @@ function initializepop(model::GAModel,npop::Integer,
     return pop,aux,rngs
 end
 
-type GAState
+mutable struct GAState
     model::GAModel
     pop::Vector
     ngen::Integer
@@ -54,7 +58,7 @@ function GAState(model::GAModel;
                  save_creature_iter=0,
                  save_state_iter=0,
                  file_name_prefix="gamodel",
-                 baserng=Base.GLOBAL_RNG)
+                 baserng=Random.GLOBAL_RNG)
     0 <= elite_fraction <= 1 || error("elite_fraction bounds")
     nelites = Int(floor(elite_fraction*npop))
     pop,aux,rngs = initializepop(model, npop, nelites, baserng)
@@ -107,7 +111,7 @@ function ga(state::GAState)
     curgen = state.curgen
     npop = state.npop
     elite_fraction = state.elite_fraction
-    crossover_params = state.crossover_params
+    crossover_params = state.crossover_params == nothing ? "Nothing" : state.crossover_params
     mutation_params = state.mutation_params
     print_fitness_iter = state.print_fitness_iter
     save_creature_iter = state.save_creature_iter
@@ -139,7 +143,7 @@ function ga(state::GAState)
     # 4. replace non-elites in current generation with children
     # 3. mutate population
     # 5. sort population
-    for curgen = curgen+1:ngen
+    for outer curgen = curgen+1:ngen
         # crossover. uses multi-threading when available
         parents = selection(pop, nchildren, rngs[1])
         @threads for i = 1:nchildren

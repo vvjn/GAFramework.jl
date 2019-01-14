@@ -7,8 +7,8 @@ using JLD
 export GAModel, GACreature, ga,
 fitness, genauxga, crossover, mutate, selection, randcreature,
 printfitness, savecreature,
-GAState,loadgastate,savegastate,
-RouletteWheelSelection,TournamentSelection
+GAState, loadgastate, savegastate,
+RouletteWheelSelection, TournamentSelection
 
 """
  To create a GA with a specific GACreature and GAModel, import this module,
@@ -43,7 +43,7 @@ fitness(x::GACreature) = x.objvalue
     model = GAM(G1,G2)
     aux = genauxga(model)
     """
-genauxga(model::GAModel) = nothing
+genauxga(model::GAModel) = zeros(1)
 
 """
     crossover(z::GACreature, x::GACreature,y::GACreature,model::GAModel, aux, rng) :: GACreature
@@ -82,7 +82,7 @@ selection(pop::Vector{<:GACreature}, n::Integer, rng) =
     Create a random instance of a GACreature, given a GAModel.
     There is always a GACreature associated with a GAModel    
     """    
-randcreature(model::GAModel,aux,rng) =
+randcreature_(model::GAModel,aux,rng) =
     error("randcreature not implemented for $(typeof(model))")
 
 """
