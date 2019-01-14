@@ -43,7 +43,7 @@ fitness(x::GACreature) = x.objvalue
     model = GAM(G1,G2)
     aux = genauxga(model)
     """
-genauxga(model::GAModel) = zeros(1)
+genauxga(model::GAModel) = nothing
 
 """
     crossover(z::GACreature, x::GACreature,y::GACreature,model::GAModel, aux, rng) :: GACreature
