@@ -1,5 +1,6 @@
 using GAFramework
-using Base.Test
+using Test
+using LinearAlgebra
 
 function test1()
     model = CoordinateModel(x -> x[1]==0.0 ? 0.0 : x[1] * sin(1/x[1]), [-1.0], [1.0])
@@ -14,7 +15,7 @@ function test1()
 end
 
 function test2()
-    model = CoordinateModel(x -> any(z -> z==0.0, x) ? 0.0 : dot(x, sin.(1./x)),
+    model = CoordinateModel(x -> any(z -> z==0.0, x) ? 0.0 : dot(x, sin.(1 ./x)),
                             -ones(Float64,15), ones(Float64,15))
     # do simulated annealing when mutating
     state = GAState(model, ngen=500, npop=300, elite_fraction=0.01,
@@ -24,7 +25,7 @@ function test2()
     x = best.value
     y = best.objvalue
     println("$best $x $y")
-    all(abs.(abs.(x) - 0.222549) .< 0.1) && abs(y - (-0.21723*15)) < 0.1
+    all(abs.(abs.(x) .- 0.222549) .< 0.1) && abs(y - (-0.21723*15)) < 0.1
 end
 
 function test3()

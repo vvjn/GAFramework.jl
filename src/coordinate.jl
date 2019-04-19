@@ -16,7 +16,7 @@ minimizes function
         z + 0.25*(y-x)*randn(T) :: T
 
 """
-immutable CoordinateModel{F,T} <: GAModel
+struct CoordinateModel{F,T} <: GAModel
     f::F
     xmin::T
     xmax::T
@@ -38,7 +38,7 @@ function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
     CoordinateModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
 end
 
-immutable CoordinateCreature{T} <: GACreature
+struct CoordinateCreature{T} <: GACreature
     value :: T
     objvalue :: Float64
 end
@@ -52,7 +52,7 @@ function randcreature(m::CoordinateModel{F,T}, aux, rng) where {F,T}
     CoordinateCreature(xvalue, m)
 end
 
-immutable AverageCrossover end
+struct AverageCrossover end
 function crossover(::AverageCrossover, z::CoordinateCreature{T},
                    x::CoordinateCreature{T}, y::CoordinateCreature{T},
                    m::CoordinateModel{F,T}, params, curgen::Integer,
@@ -61,7 +61,7 @@ function crossover(::AverageCrossover, z::CoordinateCreature{T},
     CoordinateCreature(z.value, m)
 end
 
-immutable SinglePointCrossover end
+struct SinglePointCrossover end
 function crossover(::SinglePointCrossover, z::CoordinateCreature{T},
                    x::CoordinateCreature{T}, y::CoordinateCreature{T},
                    m::CoordinateModel{F,T}, params, curgen::Integer,
@@ -78,7 +78,7 @@ function crossover(::SinglePointCrossover, z::CoordinateCreature{T},
     CoordinateCreature(z.value, m)
 end
 
-immutable TwoPointCrossover end
+struct TwoPointCrossover end
 function crossover(::TwoPointCrossover, z::CoordinateCreature{T},
                    x::CoordinateCreature{T}, y::CoordinateCreature{T},
                    m::CoordinateModel{F,T}, params, curgen::Integer,

@@ -1,4 +1,4 @@
-immutable RouletteWheelSelection end
+struct RouletteWheelSelection end
 # selection(pop::Vector{<:GACreature}, n::Integer, rng)
 function selection(::RouletteWheelSelection,
                    pop::Vector{<:GACreature}, n::Integer, rng=Base.GLOBAL_RNG)    
@@ -12,7 +12,7 @@ function selection(::RouletteWheelSelection,
             end
         end
     end
-    parents = Vector{Tuple{Int,Int}}(n)
+    parents = Vector{Tuple{Int,Int}}(undef, n)
     for k = 1:n
         i = stochasticpick()
         j = i
@@ -24,7 +24,7 @@ function selection(::RouletteWheelSelection,
     parents
 end
 
-immutable TournamentSelection
+struct TournamentSelection
     k::Int # if k=2 then binary tournament selection
     TournamentSelection(k=2) = new(k)
 end
@@ -43,7 +43,7 @@ function selection(sel::TournamentSelection,
         end
         si
     end
-    parents = Vector{Tuple{Int,Int}}(n)
+    parents = Vector{Tuple{Int,Int}}(undef, n)
     for k = 1:n
         i = stochasticpick()
         j = i
