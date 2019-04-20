@@ -1,4 +1,6 @@
 using GAFramework
+using GAFramework.CoordinateGA
+using LinearAlgebra
 
 # Solves for function a + 2b + 3c + 4d + 5e = 42
 # by minimizing abs(a + 2b + 3c + 4d + 5e - 42)

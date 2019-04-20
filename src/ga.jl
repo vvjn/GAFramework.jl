@@ -144,7 +144,7 @@ function ga(state::GAState)
             elite fraction $elite_fraction,
             children created $nchildren,
             crossover_params $(repr(crossover_params)),
-            mutation_params $mutation_params,
+            mutation_params $(repr(mutation_params)),
             printing fitness every $print_fitness_iter iteration(s),
             saving creature to file every $save_state_iter iteration(s),
             saving state every $save_state_iter iteration(s),
