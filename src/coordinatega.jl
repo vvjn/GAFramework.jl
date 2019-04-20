@@ -1,3 +1,8 @@
+module CoordinateGA
+
+using ..GAFramework
+import ..GAFramework: fitness, crossover, mutate, selection, randcreature, printfitness
+
 export CoordinateModel, CoordinateCreature
 
 """
@@ -28,10 +33,10 @@ function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
     ET = eltype(xmin)
     N = length(xmin)
     xspan = xmax .- xmin
-    # check that F(ymin), F(ymax) can be converted to Float64 without error
+    # check that f(xmin), f(xmax) can be converted to Float64 without error
     z1 = Float64(f(xmin))
     z2 = Float64(f(xmax))
-    # and that f(yspan), f(ymin), and f(ymax) has sane values maybe
+    # and that f(xspan), f(xmin), and f(xmax) has sane values maybe
     # z1!=Inf && z2!=Inf && !isnan(z1) && !isnan(z2) ||
     #    error("f(xmin) or f(xmax) objective function is either NaN or Inf")
     all(xspan .>= zero(ET)) || error("xmax[i] < xmin[i] for some i")
@@ -180,3 +185,5 @@ selection(pop::Vector{<:CoordinateCreature{T}}, n::Integer, rng) where {T} =
 
 printfitness(curgen::Integer, x::CoordinateCreature{T}) where {T} =
     println("curgen: $curgen value: $(x.value) obj. value: $(x.objvalue)")
+
+end # CoordinateGA

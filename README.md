@@ -223,7 +223,7 @@ ga(state)
 
 `state.pop[1]` gives you the creature with the best fitness.
 
-A version of `CoordinateModel` and `CoordinateCreature` are included `GAFramework`.
+A version of `CoordinateModel` and `CoordinateCreature` are included `GAFramework`. It can be used by executing the statement `using GAFramework.CoordinateGA`.
 
 ## Restarting
 

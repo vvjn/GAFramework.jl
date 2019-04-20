@@ -11,8 +11,8 @@ GAState, loadgastate, savegastate,
 RouletteWheelSelection, TournamentSelection
 
 """
- To create a GA with a specific GACreature and GAModel, import this module,
- make a GACreature and GAModel with the following interface functions:
+To create a GA with a specific GACreature and GAModel, import this module,
+make a GACreature and GAModel with the following interface functions:
     fitness (has default)
     genauxga  (has default)
     crossover (no default)
@@ -26,12 +26,14 @@ abstract type GACreature end
 abstract type GAModel end
 
 """
-Fitness
+Fitness function.
     fitness(x) is maximized always
     To minimize x.objvalue, dispatch fitness(x) to -x.objvalue for your Creature
-    Recommended to make this either x.objvalue to maximize
-        or -x.objvalue to minimize
-    fitness(x) used for selecting the fittest creature, elites, and parents
+    Recommended to make this either x.objvalue to maximize or -x.objvalue to minimize
+
+    Since fitness(x) used for selecting the fittest creature, elites, and parents,
+    all the computationally expensive part of calculating the fitness value should
+    be implemented in the randcreature method.
 """
 fitness(x::GACreature) = x.objvalue
 
@@ -71,10 +73,11 @@ mutate(creature::GACreature, model::GAModel, aux, rng) = creature
 
     Generate a vector of n tuples (i,j) where i and j are
     indices into pop, and where pop[i] and pop[j] are the
-    selected parents.    
+    selected parents.
+    Uses binary tournament selection by default. 
 """    
 selection(pop::Vector{<:GACreature}, n::Integer, rng) =
-    selection(TournamentSelection(), pop, n, rng)
+    selection(TournamentSelection(2), pop, n, rng)
 
 """
     randcreature(model::GAModel, aux)
@@ -82,7 +85,7 @@ selection(pop::Vector{<:GACreature}, n::Integer, rng) =
     Create a random instance of a GACreature, given a GAModel.
     There is always a GACreature associated with a GAModel    
     """    
-randcreature_(model::GAModel,aux,rng) =
+randcreature(model::GAModel,aux,rng) =
     error("randcreature not implemented for $(typeof(model))")
 
 """
@@ -93,13 +96,14 @@ printfitness(curgen::Integer, creature::GACreature) =
 
 """
    Saves best fitness creature to file
-   """
+"""
 savecreature(file_name_prefix::AbstractString, curgen::Integer,
-             creature::GACreature, model::GAModel) =
+    creature::GACreature, model::GAModel) =
     save("$(file_name_prefix)_creature_$(curgen).jld", "creature", creature)
 
 include("ga.jl")
-include("coordinate.jl")
 include("selections.jl")
+
+include("coordinatega.jl")
 
 end

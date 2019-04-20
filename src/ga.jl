@@ -7,12 +7,11 @@ import Base.Threads: @threads
    function to create a population for GAState or ga
 """
 function initializepop(model::GAModel,npop::Integer,
-                       nelites::Integer, baserng,sort=true)
+                       nelites::Integer, baserng=Random.GLOBAL_RNG, sortpop=true)
     # each thread gets its own auxiliary scratch space
+    # and each thread gets its own random number generator
     nthreads = Threads.nthreads()
-    rngs = let m = MersenneTwister(1)
-                [m; accumulate(Future.randjump, fill(big(10)^20, nthreads-1), init=m)]
-            end;
+    rngs = accumulate(Future.randjump, fill(big(10)^20, nthreads), init=baserng)
     aux = map(i -> genauxga(model), 1:nthreads)
     if npop > 0
         # initialize population
@@ -21,9 +20,9 @@ function initializepop(model::GAModel,npop::Integer,
         pop[1] = pop1
         @threads for i = 2:npop
             threadid = Threads.threadid()
-            pop[i] = randcreature(model,aux[threadid],rngs[threadid])
+            pop[i] = randcreature(model, aux[threadid], rngs[threadid])
         end
-        if sort
+        if sortpop
             sort!(pop,by=fitness,rev=true,
                   alg=PartialQuickSort(max(1,nelites)))
         end
@@ -33,19 +32,33 @@ function initializepop(model::GAModel,npop::Integer,
     return pop,aux,rngs
 end
 
+# this holds the full state of the genetic algorithm
+# so that it can be stored to file
 mutable struct GAState
     model::GAModel
+    # vector of the population
     pop::Vector
-    ngen::Integer
-    curgen::Integer
-    npop::Integer
+    # number of generations
+    ngen::Int
+    # current generation
+    curgen::Int
+    # size of the population
+    npop::Int
+    # fraction of population that goes to the next generation regardless
     elite_fraction::Real
+    # parameters for crossover function
     crossover_params
+    # parameters for mutate function
     mutation_params
-    print_fitness_iter::Real
-    save_creature_iter::Real
-    save_state_iter::Integer    
+    # print the fitness of fittest creature every n iteration
+    print_fitness_iter::Int
+    # save the fittest creature to file every n iteration
+    save_creature_iter::Int
+    # save the entire state of the GA (i.e. this struct) to file every n iteration
+    save_state_iter::Int
+    # prefix for the files to be save
     file_name_prefix::AbstractString
+    # random number generator for replication purposes
     baserng::AbstractRNG
 end
 function GAState(model::GAModel;
@@ -111,7 +124,7 @@ function ga(state::GAState)
     curgen = state.curgen
     npop = state.npop
     elite_fraction = state.elite_fraction
-    crossover_params = state.crossover_params == nothing ? "Nothing" : state.crossover_params
+    crossover_params = state.crossover_params
     mutation_params = state.mutation_params
     print_fitness_iter = state.print_fitness_iter
     save_creature_iter = state.save_creature_iter
@@ -130,7 +143,7 @@ function ga(state::GAState)
             generation number $ngen,
             elite fraction $elite_fraction,
             children created $nchildren,
-            crossover_params $crossover_params,
+            crossover_params $(repr(crossover_params)),
             mutation_params $mutation_params,
             printing fitness every $print_fitness_iter iteration(s),
             saving creature to file every $save_state_iter iteration(s),

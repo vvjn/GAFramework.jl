@@ -1,6 +1,8 @@
-using GAFramework
 using Test
 using LinearAlgebra
+
+using GAFramework
+using GAFramework.CoordinateGA
 
 function test1()
     model = CoordinateModel(x -> x[1]==0.0 ? 0.0 : x[1] * sin(1/x[1]), [-1.0], [1.0])
