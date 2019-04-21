@@ -1,4 +1,3 @@
-using Random
 import Future
 import Base.Threads: @threads
 #macro threads(ex) :($(esc(ex))) end 
@@ -48,7 +47,7 @@ mutable struct GAState
     elite_fraction::Real
     # parameters for crossover function
     crossover_params
-    # parameters for mutate function
+    # parameters for mutation function
     mutation_params
     # print the fitness of fittest creature every n iteration
     print_fitness_iter::Int
@@ -86,10 +85,112 @@ function GAState(model::GAModel;
                    baserng)
 end
 
+struct GAIterable
+    state :: GAState
+    children :: Vector
+    aux :: Vector
+    rngs :: Vector
+end
+
+function ga!(st::GAState)  
+    println("Running genetic algorithm with
+            population size $(st.npop),
+            generation number $(st.ngen),
+            elite fraction $(st.elite_fraction),
+            crossover_params $(repr((st.crossover_params))),
+            mutation_params $(repr((st.mutation_params))),
+            printing fitness every $(st.print_fitness_iter) iteration(s),
+            saving creature to file every $(st.save_state_iter) iteration(s),
+            saving state every $(st.save_state_iter) iteration(s),
+            with file name prefix $(st.file_name_prefix).")
+    it = GAIterable(st)
+    foreach(identity, savegastate(savecreature(printfitness(it))))
+    st.pop[1]
+end
+
+#        - logging
+#            x saves state every save_state_iter iterations to file
+#                - restart using state = loadgastate(filename) & ga!(state)
+#            x outputs creature every save_creature_iter iterations to file
+#            x prints fitness value every print_fitness_iter iterations to screen
+#
+function printfitness(it)
+    f(st) = if st.print_fitness_iter > 0 && mod(st.curgen, st.print_fitness_iter) == 0
+        printfitness(st.curgen, st.pop[1])
+    end
+    ((f(st); st) for st in it)
+end
+
+function savecreature(it)
+    f(st) = if st.save_creature_iter > 0 && mod(st.curgen, st.save_creature_iter) == 0
+        savecreature(st.file_name_prefix, st.curgen, st.pop[1], st.model)
+    end
+    ((f(st); st) for st in it)
+end
+
+function savegastate(it)
+    f(st) = if st.save_state_iter > 0 && mod(st.curgen, st.save_state_iter) == 0
+        savegastate(st.file_name_prefix, st.curgen, st)
+    end
+    ((f(st); st) for st in it)
+end
+
+function GAIterable(st::GAState)
+    (_, aux, rngs) = initializepop(st.model, 0, 0, st.baserng)
+    nelites = Int(floor(st.elite_fraction * st.npop))
+    children = deepcopy(st.pop[nelites+1:end])
+    GAIterable(st, children, aux, rngs)
+end
+
+"""
+    ga function
+    x in each generation, the following is done
+        - select parents from all creatures in population
+        - create children using crossover
+        - replace non-elites in population with children
+        - mutate all creatures (both elites and children) in population
+"""
+function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
+    st = it.state
+    nelites = Int(floor(st.elite_fraction * st.npop))
+    nchildren = st.npop - nelites
+
+    if iteration > st.ngen
+        return nothing
+    end
+
+   # main loop:
+    # 1. select parents
+    # 2. crossover parents & create children
+    # 4. replace non-elites in current generation with children
+    # 3. mutate population
+    # 5. sort population
+    parents = selection(st.pop, nchildren, it.rngs[1])
+    for i = 1:nchildren
+        threadid = Threads.threadid()
+        p1,p2 = parents[i]
+        it.children[i] = crossover(it.children[i], st.pop[p1], st.pop[p2],
+            st.model, st, it.aux[threadid], it.rngs[threadid])
+    end
+    # moves children and elites to current pop
+    st.pop[nelites+1:end] = it.children
+    
+    # mutate pop, including elites (except for the most elite creature
+    # in order to preserve monotonocity wrt best fitness)
+    for i = 2:st.npop
+        threadid = Threads.threadid()
+        st.pop[i] = mutation(st.pop[i], st.model, st,
+            it.aux[threadid], it.rngs[threadid])
+    end
+    sort!(st.pop, by=fitness, rev=true, alg=PartialQuickSort(max(1,nelites)))
+
+    st.curgen += 1
+
+    st, iteration+1
+end
+
 """
        Saves ga state to file
-       Doesn't support GAModels or GACreatures containing functions (e.g. CoordinateModel)
-       since JLD doesn't support saving functions
 """       
 function savegastate(file_name_prefix::AbstractString, curgen::Integer, state::GAState)
     filename = "$(file_name_prefix)_state_$(curgen).jld"
@@ -100,108 +201,4 @@ end
 function loadgastate(filename::AbstractString)
     println("Load state from file $filename")
     load(filename, "state")
-end
-
-"""
-    ga function
-    x in each generation, the following is done
-        - select parents from all creatures in population
-        - create children using crossover
-        - replace non-elites in population with children
-        - mutate all creatures (both elites and children) in population
-        - logging
-            x saves state every save_state_iter iterations to file
-                - restart using state = loadgastate(filename) & ga(state)
-            x outputs creature every save_creature_iter iterations to file
-            x prints fitness value every print_fitness_iter iterations to screen
-        - go to next generation
-            """
-function ga(state::GAState)
-    # load from state
-    model = state.model
-    pop = state.pop
-    ngen = state.ngen
-    curgen = state.curgen
-    npop = state.npop
-    elite_fraction = state.elite_fraction
-    crossover_params = state.crossover_params
-    mutation_params = state.mutation_params
-    print_fitness_iter = state.print_fitness_iter
-    save_creature_iter = state.save_creature_iter
-    save_state_iter = state.save_state_iter
-    file_name_prefix = state.file_name_prefix
-    baserng = state.baserng
-
-    nelites = Int(floor(elite_fraction*npop))
-    nchildren = npop-nelites
-    children = deepcopy(pop[nelites+1:end])
-    # initialize auxiliary space
-    _,aux,rngs = initializepop(model, 0, 0, baserng)
-
-    println("Running genetic algorithm with
-            population size $npop,
-            generation number $ngen,
-            elite fraction $elite_fraction,
-            children created $nchildren,
-            crossover_params $(repr(crossover_params)),
-            mutation_params $(repr(mutation_params)),
-            printing fitness every $print_fitness_iter iteration(s),
-            saving creature to file every $save_state_iter iteration(s),
-            saving state every $save_state_iter iteration(s),
-            with file name prefix $file_name_prefix.")
-
-    # main loop:
-    # 1. select parents
-    # 2. crossover parents & create children
-    # 4. replace non-elites in current generation with children
-    # 3. mutate population
-    # 5. sort population
-    for outer curgen = curgen+1:ngen
-        # crossover. uses multi-threading when available
-        parents = selection(pop, nchildren, rngs[1])
-        @threads for i = 1:nchildren
-            threadid = Threads.threadid()
-            p1,p2 = parents[i]
-            children[i] = crossover(children[i], pop[p1], pop[p2],
-                                    model, crossover_params, curgen,
-                                    aux[threadid], rngs[threadid])
-        end
-        # moves children and elites to current pop
-        for i = 1:nchildren
-            ip = nelites+i
-            # swapping instead of deepcopy-ing
-            pop[ip], children[i] = children[i], pop[ip]
-        end
-        # mutate pop (including elites; except for the most elite creature
-        # in order to preserve monotonocity wrt best fitness)
-        @threads for i = 2:npop
-            threadid = Threads.threadid()
-            pop[i] = mutate(pop[i], model, mutation_params, curgen,
-                            aux[threadid], rngs[threadid])
-        end
-        sort!(pop,by=fitness,rev=true,alg=PartialQuickSort(max(1,nelites)))
-
-        if print_fitness_iter>0 && mod(curgen,print_fitness_iter)==0
-            printfitness(curgen, pop[1])
-        end
-
-        if save_creature_iter>0 && mod(curgen,save_creature_iter)==0
-            savecreature(file_name_prefix, curgen, pop[1], model)
-        end
-
-        if save_state_iter>0 && mod(curgen,save_state_iter)==0
-            state = GAState(model,pop,ngen,curgen,npop,
-                            elite_fraction,
-                            crossover_params,
-                            mutation_params,
-                            print_fitness_iter,
-                            save_creature_iter,
-                            save_state_iter,
-                            file_name_prefix,
-                            baserng)
-            savegastate(file_name_prefix, curgen, state)
-        end
-    end
-    state.curgen = curgen
-    pop[1]
 end

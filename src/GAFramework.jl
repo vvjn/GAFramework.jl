@@ -2,12 +2,13 @@ __precompile__()
 
 module GAFramework
 
-using JLD
+using Random
+using FileIO
 
-export GAModel, GACreature, ga,
-fitness, genauxga, crossover, mutate, selection, randcreature,
+export GAModel, GACreature, ga!,
+fitness, genauxga, crossover, mutation, selection, randcreature,
 printfitness, savecreature,
-GAState, loadgastate, savegastate,
+GAState, GAIterable, loadgastate, savegastate,
 RouletteWheelSelection, TournamentSelection
 
 """
@@ -16,7 +17,7 @@ make a GACreature and GAModel with the following interface functions:
     fitness (has default)
     genauxga  (has default)
     crossover (no default)
-    mutate (has identity function as default)
+    mutation (has identity function as default)
     selection (has default)
     randcreature (no default)
     printfitness (has default)
@@ -24,6 +25,8 @@ make a GACreature and GAModel with the following interface functions:
  """
 abstract type GACreature end
 abstract type GAModel end
+
+include("ga.jl")
 
 """
 Fitness function.
@@ -60,13 +63,13 @@ genauxga(model::GAModel) = nothing
     z = randcreature(model,aux)
     child = crossover(z,x,y,model,aux,rng)
 """
-crossover(z::GACreature, x::GACreature, y::GACreature, model::GAModel, aux, rng) =
+crossover(z::GACreature, x::GACreature, y::GACreature, model::GAModel, st::GAState, aux, rng::AbstractRNG) =
     error("crossover not implemented for $(typeof(z)) and $(typeof(model))")
 
 """
     Mutates a incoming creature and outputs mutated creature
 """
-mutate(creature::GACreature, model::GAModel, aux, rng) = creature
+mutation(creature::GACreature, model::GAModel, st::GAState, aux, rng::AbstractRNG) = creature
 
 """
     selection(pop::Vector{<:GACreature}, n::Integer, rng)
@@ -85,7 +88,7 @@ selection(pop::Vector{<:GACreature}, n::Integer, rng) =
     Create a random instance of a GACreature, given a GAModel.
     There is always a GACreature associated with a GAModel    
     """    
-randcreature(model::GAModel,aux,rng) =
+randcreature(model::GAModel, aux, rng::AbstractRNG) =
     error("randcreature not implemented for $(typeof(model))")
 
 """
@@ -101,7 +104,6 @@ savecreature(file_name_prefix::AbstractString, curgen::Integer,
     creature::GACreature, model::GAModel) =
     save("$(file_name_prefix)_creature_$(curgen).jld", "creature", creature)
 
-include("ga.jl")
 include("selections.jl")
 
 include("coordinatega.jl")

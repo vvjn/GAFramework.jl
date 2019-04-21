@@ -218,7 +218,7 @@ state = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
 This runs the GA and we are done.
 
 ```julia
-ga(state)
+ga!(state)
 ````
 
 `state.pop[1]` gives you the creature with the best fitness.
@@ -227,7 +227,7 @@ A version of `CoordinateModel` and `CoordinateCreature` are included `GAFramewor
 
 ## Restarting
 
-After we finish a GA run using `ga(state)`, if we decide that we
+After we finish a GA run using `ga!(state)`, if we decide that we
 want to continue optimizing for a few more generations, we can do the
 following.  Here, we change maximum number of generations to 200, and
 then restart the GA, continuing on from where the GA stopped earlier.
@@ -235,7 +235,7 @@ then restart the GA, continuing on from where the GA stopped earlier.
 ```julia
 state.ngen = 200
 
-ga(state)
+ga!(state)
 ```
 
 ## Replicability with respect to pseudo-randomness
@@ -251,12 +251,12 @@ set to `Base.GLOBAL_RNG`.
 state1 = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
                        mutation_params=Dict(:rate=>0.1),
                        print_fitness_iter=10, baserng=MersenneTwister(12))
-best1 = ga(state1)
+best1 = ga!(state1)
 
 state2 = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
                        mutation_params=Dict(:rate=>0.1),
                        print_fitness_iter=10, baserng=MersenneTwister(12))
-best2 = ga(state2)
+best2 = ga!(state2)
 
 println(all([getfield(state1,x) == getfield(state2,x) for x in fieldnames(GAState)]))
 # true
@@ -274,7 +274,7 @@ state = GAState(m, ngen=100, npop=1000, elite_fraction=0.01,
                 save_creature_iter=10, file_name_prefix="minexp_6000")
 ```
 
-After we finish a GA run using `ga(state)`, and we decide that we
+After we finish a GA run using `ga!(state)`, and we decide that we
 want to save the best creature to file afterwards, we can do the following.
 
 ```julia
@@ -294,14 +294,14 @@ state = GAState(m, ngen=100, npop=1000, elite_fraction=0.01,
                 save_state_iter=100, file_name_prefix="minexp_6000")
 ```
 
-If something happens during the middle of running `ga(state)`, we can
+If something happens during the middle of running `ga!(state)`, we can
 reload the state from file from the 100th generation as follows, and
 then restart the GA from the saved generation.
 
 ```julia
 state = loadgastate("minexp_6000_state_100.jld")
 
-ga(state)
+ga!(state)
 ```
 
 We can also directly save the state using the following.

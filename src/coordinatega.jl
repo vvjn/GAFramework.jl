@@ -1,7 +1,8 @@
 module CoordinateGA
 
+using Random
 using ..GAFramework
-import ..GAFramework: fitness, crossover, mutate, selection, randcreature, printfitness
+import ..GAFramework: fitness, crossover, mutation, selection, randcreature, printfitness
 
 export CoordinateModel, CoordinateCreature
 
@@ -12,7 +13,7 @@ minimizes function
     state = GAState(model, ngen=500, npop=6_000, elite_fraction=0.1,
                        crossover_rate=0.9, mutation_rate=0.9,
                        print_fitness_iter=1)
-    ga(state)
+    ga!(state)
 
     type T has to have properties
         y-x :: T     
@@ -52,7 +53,7 @@ CoordinateCreature(value::T, m::CoordinateModel{F,T}) where {F,T} =
 
 fitness(x::CoordinateCreature{T}) where {T} = -x.objvalue
 
-function randcreature(m::CoordinateModel{F,T}, aux, rng) where {F,T}
+function randcreature(m::CoordinateModel{F,T}, aux, rng::AbstractRNG) where {F,T}
     xvalue = m.xmin .+ m.xspan .* rand(rng,length(m.xspan))
     CoordinateCreature(xvalue, m)
 end
@@ -60,7 +61,7 @@ end
 struct AverageCrossover end
 function crossover(::AverageCrossover, z::CoordinateCreature{T},
                    x::CoordinateCreature{T}, y::CoordinateCreature{T},
-                   m::CoordinateModel{F,T}, params, curgen::Integer,
+                   m::CoordinateModel{F,T}, st::GAState,
                    aux, rng) where {F,T}
     z.value .= 0.5 .* (x.value .+ y.value)
     CoordinateCreature(z.value, m)
@@ -69,8 +70,8 @@ end
 struct SinglePointCrossover end
 function crossover(::SinglePointCrossover, z::CoordinateCreature{T},
                    x::CoordinateCreature{T}, y::CoordinateCreature{T},
-                   m::CoordinateModel{F,T}, params, curgen::Integer,
-                   aux, rng) where {F,T}
+                   m::CoordinateModel{F,T}, params, st::GAState,
+                   aux, rng::AbstractRNG) where {F,T}
     N = length(x.value)
     i = rand(rng, 1:N)
     if rand(rng) < 0.5
@@ -85,9 +86,9 @@ end
 
 struct TwoPointCrossover end
 function crossover(::TwoPointCrossover, z::CoordinateCreature{T},
-                   x::CoordinateCreature{T}, y::CoordinateCreature{T},
-                   m::CoordinateModel{F,T}, params, curgen::Integer,
-                   aux, rng) where {F,T}
+    x::CoordinateCreature{T}, y::CoordinateCreature{T},
+    m::CoordinateModel{F,T}, st::GAState,
+    aux, rng::AbstractRNG) where {F,T}
     N = length(x.value)
     i,j = rand(rng, 1:N, 2)
     i,j = i > j ? (j,i) : (i,j)
@@ -102,15 +103,15 @@ function crossover(::TwoPointCrossover, z::CoordinateCreature{T},
 end
 
 function crossover(z::CoordinateCreature{T},
-                   x::CoordinateCreature{T}, y::CoordinateCreature{T},
-                   m::CoordinateModel{F,T}, params, curgen::Integer,
-                   aux, rng) where {F,T}
-    crossover(TwoPointCrossover(), z, x, y, m, nothing, curgen, aux, rng)
+    x::CoordinateCreature{T}, y::CoordinateCreature{T},
+    m::CoordinateModel{F,T}, st::GAState,
+    aux, rng::AbstractRNG) where {F,T}
+    crossover(TwoPointCrossover(), z, x, y, m, st, aux, rng)
 end
 
 # Mutate over all dimensions
 function mutatenormal(temp::Real, x::CoordinateCreature{T},
-                      model::CoordinateModel{F,T}, rng) where {F,T}
+                      model::CoordinateModel{F,T}, rng::AbstractRNG) where {F,T}
     x.value .+= temp .* model.xspan .* randn(rng,length(x.value))
     model.clamp && (x.value .= clamp.(x.value, model.xmin, model.xmax))
     CoordinateCreature(x.value, model)
@@ -118,19 +119,20 @@ end
 
 # Mutate through a single dimension
 function mutatenormaldim(temp::Real, x::CoordinateCreature{T}, dim::Integer,
-                         model::CoordinateModel{F,T}, rng) where {F,T}
+                         model::CoordinateModel{F,T}, rng::AbstractRNG) where {F,T}
     ET = eltype(T)
     x.value[dim] += temp * model.xspan[dim] * randn(rng,ET)
     model.clamp && (x.value[dim] = clamp(x.value[dim], model.xmin[dim], model.xmax[dim]))
     CoordinateCreature(x.value, model)
 end
 
-function mutate(x::CoordinateCreature{T}, model::CoordinateModel{F,T},
-                params, curgen::Integer, aux, rng) where {F,T}
-    if rand(rng) < params[:rate]
+function mutation(x::CoordinateCreature{T}, model::CoordinateModel{F,T}, st::GAState,
+    aux, rng::AbstractRNG) where {F,T}
+    params = st.mutation_params
+    if rand(rng) < get(params, :rate, 0.0)
         if rand(rng) < get(params, :sa_rate, 0.0)
             sa(x,model,params[:k], params[:lambda],
-               params[:maxiter], curgen, aux, rng)
+               params[:maxiter], st.curgen, aux, rng)
         else
             N = length(x.value)
             mutatenormaldim(0.1, x, rand(1:N), model, rng)
@@ -140,10 +142,10 @@ function mutate(x::CoordinateCreature{T}, model::CoordinateModel{F,T},
     end
 end
 
-export sa,satemp,saprob,mutatenormal
+# export sa,satemp,saprob,mutatenormal
 function sa(x::CoordinateCreature{T}, model::CoordinateModel{F,T},
-            k::Real, lambda::Real, maxiter::Integer, curgen::Integer,
-            aux, rng) where {F,T}
+    k::Real, lambda::Real, maxiter::Integer, curgen::Int,
+    aux, rng::AbstractRNG) where {F,T}
     N = length(x.value)
     y = x
     numnoups = 0 # number of consecutive

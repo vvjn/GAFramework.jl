@@ -9,7 +9,7 @@ function test1()
     state = GAState(model, ngen=50, npop=300, elite_fraction=0.01,
                     mutation_params=Dict(:rate=>0.1),
                     print_fitness_iter=10)    
-    best = ga(state)
+    best = ga!(state)
     x = best.value[1]
     y = best.objvalue
     println("$best $x $y")
@@ -23,7 +23,7 @@ function test2()
     state = GAState(model, ngen=500, npop=300, elite_fraction=0.01,
                     mutation_params=Dict(:rate=>0.1,:sa_rate=>0.1,:k=>1,
                                          :lambda=>1/1000,:maxiter=>1000), print_fitness_iter=50)
-    best = ga(state)
+    best = ga!(state)
     x = best.value
     y = best.objvalue
     println("$best $x $y")
@@ -36,7 +36,7 @@ function test3()
     state = GAState(model, ngen=500, npop=300, elite_fraction=0.01,
                     mutation_params=Dict(:rate=>0.1,:sa_rate=>0.1,:k=>1,
                                          :lambda=>1/1000,:maxiter=>1000), print_fitness_iter=50)    
-    best = ga(state)
+    best = ga!(state)
     x = best.value
     y = best.objvalue
     println("$best $x $y")
