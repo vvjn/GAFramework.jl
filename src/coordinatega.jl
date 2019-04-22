@@ -1,35 +1,143 @@
 module CoordinateGA
 
 using Random
+using LinearAlgebra: dot
 using ..GAFramework
-import ..GAFramework: fitness, crossover, mutation, selection, randcreature, printfitness
+import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature
 
-export CoordinateModel, CoordinateCreature
+export CoordinateCreature, FunctionModel, SumModel
 
+# This is a CoordinateCreature, T is some coordinate type like Vector
+# and objvalue is some objective value
+struct CoordinateCreature{T} <: GACreature
+    value :: T
+    objvalue :: Float64
+end
+
+# Negative, since we are minimizing the objective value
+fitness(x::CoordinateCreature{T}) where {T} = -x.objvalue
+
+# We can use multiple models to optimize this creature.
+# To demonstrate, below we use the FunctionModel model
+# as well as the SumModel
+
+# The following are some crossover functions for the CoordinateCreature
+# Each model can choose its own crossover function
+struct AverageCrossover end
+function crossover!(::AverageCrossover, z::CoordinateCreature{T},
+    x::CoordinateCreature{T}, y::CoordinateCreature{T},
+    st::GAState, aux, rng::AbstractRNG) where {T}
+    z.value .= 0.5 .* (x.value .+ y.value)
+    CoordinateCreature(z.value, st.model)
+end
+
+struct SinglePointCrossover end
+function crossover!(::SinglePointCrossover, z::CoordinateCreature{T},
+    x::CoordinateCreature{T}, y::CoordinateCreature{T},
+    st::GAState, aux, rng::AbstractRNG) where {T}
+    N = length(x.value)
+    i = rand(rng, 1:N)
+    if rand(rng) < 0.5
+        z.value[1:i] = x.value[1:i]
+        z.value[i+1:end] = y.value[i+1:end]
+    else
+        z.value[1:i] = y.value[1:i]
+        z.value[i+1:end] = x.value[i+1:end]
+    end
+    CoordinateCreature(z.value, st.model)
+end
+
+struct TwoPointCrossover end
+function crossover!(::TwoPointCrossover, z::CoordinateCreature{T},
+    x::CoordinateCreature{T}, y::CoordinateCreature{T},
+    st::GAState, aux, rng::AbstractRNG) where {T}
+    N = length(x.value)
+    i,j = rand(rng, 1:N, 2)
+    i,j = i > j ? (j,i) : (i,j)
+    if rand(rng) < 0.5
+        z.value[:] = x.value
+        z.value[i+1:j] = y.value[i+1:j]
+    else
+        z.value[:] = y.value
+        z.value[i+1:j] = x.value[i+1:j]
+    end
+    CoordinateCreature(z.value, st.model)
+end
+
+printfitness(curgen::Int, x::CoordinateCreature{T}) where {T} =
+    println("curgen: $curgen value: $(x.value) obj. value: $(x.objvalue)")
+
+
+# The following is the SumModel
+# It finds a d-dimensional coordinate x such that dot(x, 1:length(x)) ≈ y
+"""
+    model = SumModel(5, 42.)
+    state = GAState(model, ngen=500, npop=6_000, elite_fraction=0.1,
+                       params=Dict(:mutation_rate=>0.9, :print_fitness_iter=>1))
+    ga!(state)
+"""
+struct SumModel{T} <: GAModel
+    d::Int
+    target::T
+end
+
+function CoordinateCreature(value::Vector{T}, m::SumModel{T}) where {T}
+    objval = Float64(abs(dot(value, 1:length(value)) - m.target))
+    CoordinateCreature(value, objval)
+end
+
+function randcreature(m::SumModel{T}, aux, rng::AbstractRNG) where {T}
+    value = rand(rng, m.d)
+    CoordinateCreature(value, m)
+end
+
+function mutation!(x::CoordinateCreature,
+    st::GAState{SumModel{T}}, aux, rng::AbstractRNG) where {T}
+    gp = st.params
+    if rand(rng) < get(gp, :mutation_rate, 0.1)
+        x.value[rand(rng, 1:length(x.value))] += st.model.target * randn(rng,T)
+        CoordinateCreature(x.value, st.model)
+    else
+        x
+    end
+end
+
+function crossover!(z::CoordinateCreature,
+    x::CoordinateCreature, y::CoordinateCreature,
+    st::GAState{SumModel{T}}, aux, rng::AbstractRNG) where {T}
+    crossover!(TwoPointCrossover(), z, x, y, st, aux, rng)
+end
+
+function selection(pop::Vector, n::Integer,
+    st::GAState{SumModel{T}}, rng::AbstractRNG) where {T}
+    selection(TournamentSelection(2), pop, n, rng)
+end
+
+# The following is the FunctionModel
+# It's a more complicated model than above
+# It minimizes the objective value using a given objective function
 """
 # E.g.
-minimizes function
-    model = CoordinateModel(x -> abs(x[1] - 20.0), -200.0, 200.0)
+    model = FunctionModel(x -> abs(x[1] - 20.0), [-200.0], [200.0])
     state = GAState(model, ngen=500, npop=6_000, elite_fraction=0.1,
-                       crossover_rate=0.9, mutation_rate=0.9,
-                       print_fitness_iter=1)
+                       params=Dict(:mutation_rate=>0.9, :print_fitness_iter=>1))
     ga!(state)
 
     type T has to have properties
-        y-x :: T     
+        y-x :: T
         0.25 .* (x+y) :: T
         randn(T) :: T
         z + 0.25*(y-x)*randn(T) :: T
 
 """
-struct CoordinateModel{F,T} <: GAModel
+struct FunctionModel{F,T} <: GAModel
     f::F
     xmin::T
     xmax::T
     xspan::T # xmax-xmin
     clamp::Bool
 end
-function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
+function FunctionModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
     xmin,xmax = promote(xmin,xmax)
     ET = eltype(xmin)
     N = length(xmin)
@@ -41,101 +149,55 @@ function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
     # z1!=Inf && z2!=Inf && !isnan(z1) && !isnan(z2) ||
     #    error("f(xmin) or f(xmax) objective function is either NaN or Inf")
     all(xspan .>= zero(ET)) || error("xmax[i] < xmin[i] for some i")
-    CoordinateModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
+    FunctionModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
 end
 
-struct CoordinateCreature{T} <: GACreature
-    value :: T
-    objvalue :: Float64
-end
-CoordinateCreature(value::T, m::CoordinateModel{F,T}) where {F,T} =
-    CoordinateCreature{T}(value, m.f(value))
+CoordinateCreature(value::T, m::FunctionModel{F,T}) where {F,T} =
+    CoordinateCreature(value, m.f(value))
 
-fitness(x::CoordinateCreature{T}) where {T} = -x.objvalue
-
-function randcreature(m::CoordinateModel{F,T}, aux, rng::AbstractRNG) where {F,T}
-    xvalue = m.xmin .+ m.xspan .* rand(rng,length(m.xspan))
+function randcreature(m::FunctionModel{F,T}, aux, rng::AbstractRNG) where {F,T}
+    ET = eltype(T)
+    if T <: Vector
+        xvalue = m.xmin .+ m.xspan .* rand(rng, ET, length(m.xspan))
+    else
+        xvalue = m.xmin .+ m.xspan .* rand(rng, T)
+    end
     CoordinateCreature(xvalue, m)
 end
 
-struct AverageCrossover end
-function crossover(::AverageCrossover, z::CoordinateCreature{T},
-                   x::CoordinateCreature{T}, y::CoordinateCreature{T},
-                   m::CoordinateModel{F,T}, st::GAState,
-                   aux, rng) where {F,T}
-    z.value .= 0.5 .* (x.value .+ y.value)
-    CoordinateCreature(z.value, m)
-end
-
-struct SinglePointCrossover end
-function crossover(::SinglePointCrossover, z::CoordinateCreature{T},
-                   x::CoordinateCreature{T}, y::CoordinateCreature{T},
-                   m::CoordinateModel{F,T}, params, st::GAState,
-                   aux, rng::AbstractRNG) where {F,T}
-    N = length(x.value)
-    i = rand(rng, 1:N)
-    if rand(rng) < 0.5
-        z.value[1:i] = x.value[1:i]
-        z.value[i+1:end] = y.value[i+1:end]
-    else
-        z.value[1:i] = y.value[1:i]
-        z.value[i+1:end] = x.value[i+1:end]
-    end
-    CoordinateCreature(z.value, m)
-end
-
-struct TwoPointCrossover end
-function crossover(::TwoPointCrossover, z::CoordinateCreature{T},
+function crossover!(z::CoordinateCreature{T},
     x::CoordinateCreature{T}, y::CoordinateCreature{T},
-    m::CoordinateModel{F,T}, st::GAState,
-    aux, rng::AbstractRNG) where {F,T}
-    N = length(x.value)
-    i,j = rand(rng, 1:N, 2)
-    i,j = i > j ? (j,i) : (i,j)
-    if rand(rng) < 0.5
-        z.value[:] = x.value
-        z.value[i+1:j] = y.value[i+1:j]
-    else
-        z.value[:] = y.value
-        z.value[i+1:j] = x.value[i+1:j]
-    end
-    CoordinateCreature(z.value, m)
-end
-
-function crossover(z::CoordinateCreature{T},
-    x::CoordinateCreature{T}, y::CoordinateCreature{T},
-    m::CoordinateModel{F,T}, st::GAState,
-    aux, rng::AbstractRNG) where {F,T}
-    crossover(TwoPointCrossover(), z, x, y, m, st, aux, rng)
+    st::GAState{FunctionModel{F,T}}, aux, rng::AbstractRNG) where {F,T}
+    crossover!(TwoPointCrossover(), z, x, y, st, aux, rng)
 end
 
 # Mutate over all dimensions
-function mutatenormal(temp::Real, x::CoordinateCreature{T},
-                      model::CoordinateModel{F,T}, rng::AbstractRNG) where {F,T}
+function mutatenormal!(x::CoordinateCreature{T}, temp::Real,
+    model::FunctionModel{F,T}, rng::AbstractRNG) where {F,T}
     x.value .+= temp .* model.xspan .* randn(rng,length(x.value))
     model.clamp && (x.value .= clamp.(x.value, model.xmin, model.xmax))
     CoordinateCreature(x.value, model)
 end
 
 # Mutate through a single dimension
-function mutatenormaldim(temp::Real, x::CoordinateCreature{T}, dim::Integer,
-                         model::CoordinateModel{F,T}, rng::AbstractRNG) where {F,T}
+function mutatenormaldim!(x::CoordinateCreature{T}, temp::Real, dim::Integer,
+    model::FunctionModel{F,T}, rng::AbstractRNG) where {F,T}
     ET = eltype(T)
     x.value[dim] += temp * model.xspan[dim] * randn(rng,ET)
     model.clamp && (x.value[dim] = clamp(x.value[dim], model.xmin[dim], model.xmax[dim]))
     CoordinateCreature(x.value, model)
 end
 
-function mutation(x::CoordinateCreature{T}, model::CoordinateModel{F,T}, st::GAState,
-    aux, rng::AbstractRNG) where {F,T}
-    params = st.mutation_params
-    if rand(rng) < get(params, :rate, 0.0)
-        if rand(rng) < get(params, :sa_rate, 0.0)
-            sa(x,model,params[:k], params[:lambda],
-               params[:maxiter], st.curgen, aux, rng)
+function mutation!(x::CoordinateCreature{T},
+    st::GAState{FunctionModel{F,T}}, aux, rng::AbstractRNG) where {F,T}
+    gp = st.params
+    if rand(rng) < get(gp, :mutation_rate, 0.1)
+        if rand(rng) < get(gp, :sa_rate, 0.0)
+            sa(x, st.model, gp[:sa_k], gp[:sa_lambda],
+                gp[:sa_maxiter], st.curgen, aux, rng)
         else
             N = length(x.value)
-            mutatenormaldim(0.1, x, rand(1:N), model, rng)
+            mutatenormaldim!(x, 0.1, rand(rng, 1:N), st.model, rng)
         end
     else
         x
@@ -143,7 +205,7 @@ function mutation(x::CoordinateCreature{T}, model::CoordinateModel{F,T}, st::GAS
 end
 
 # export sa,satemp,saprob,mutatenormal
-function sa(x::CoordinateCreature{T}, model::CoordinateModel{F,T},
+function sa(x::CoordinateCreature{T}, model::FunctionModel{F,T},
     k::Real, lambda::Real, maxiter::Integer, curgen::Int,
     aux, rng::AbstractRNG) where {F,T}
     N = length(x.value)
@@ -158,7 +220,7 @@ function sa(x::CoordinateCreature{T}, model::CoordinateModel{F,T},
         yvdim_old = y.value[dim]
         yov_old = y.objvalue
         fitness_old = fitness(y)
-        y = mutatenormaldim(temp, y, dim, model, rng)
+        y = mutatenormaldim!(y, temp, dim, model, rng)
         diffe = fitness(y) - fitness_old
         if diffe >= 0
         elseif rand(rng) < saprob(diffe, temp)
@@ -182,10 +244,10 @@ saprob(diff::Real, iter::Integer, k::Real, lambda::Real) =
     exp(diff / satemp(iter, k, lambda))
 saprob(diff::Real, temp::Real) = exp(diff / temp)
 
-selection(pop::Vector{<:CoordinateCreature{T}}, n::Integer, rng) where {T} =
+function selection(pop::Vector, n::Integer,
+    st::GAState{FunctionModel{F,T}}, rng::AbstractRNG) where {F,T}
     selection(TournamentSelection(2), pop, n, rng)
-
-printfitness(curgen::Integer, x::CoordinateCreature{T}) where {T} =
-    println("curgen: $curgen value: $(x.value) obj. value: $(x.objvalue)")
+end
 
 end # CoordinateGA
+

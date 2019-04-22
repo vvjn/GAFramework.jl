@@ -42,7 +42,7 @@ functions.
 
 ```julia
 using GAFramework
-import GAFramework: fitness, genauxga, crossover, mutate, selection,
+import GAFramework: fitness, genauxga, crossover!, mutation!, selection,
 randcreature,printfitness, savecreature
 ```
 
@@ -116,7 +116,7 @@ we re-use memory from the `z` object when creating
 the new `CoordinateCreature`.
 
 ```julia
-function crossover(z::CoordinateCreature{T}, x::CoordinateCreature{T},
+function crossover!(z::CoordinateCreature{T}, x::CoordinateCreature{T},
                    y::CoordinateCreature{T}, m::CoordinateModel{F,T},
                    params, curgen, aux, rng) where {F,T}
               z.value[:] = 0.5 .* (x.value .+ y.value)
@@ -131,7 +131,7 @@ operator).  Clamping is optionally done to restrict points to be
 inside the box.
 
 ```julia
-function mutate(x::CoordinateCreature{T}, m::CoordinateModel{F,T},
+function mutation!(x::CoordinateCreature{T}, m::CoordinateModel{F,T},
                 params, curgen, aux, rng) where {F,T}
     if rand(rng) < params[:rate]            
         x.value .+= 0.01 .* m.xspan .* randn(rng,length(x.value))
@@ -204,10 +204,10 @@ number of generations 100, fraction of elite creatures 0.01, and
 mutation rate 0.1, printing the objective value every 10
 iterations. The `GAState` function generates the population and
 `state` contains all data required to start/restart a GA.  Each
-generation, the GA will create children (using `crossover`) from
+generation, the GA will create children (using `crossover!`) from
 selected (using `selection`) parents, replace the non-elites in the
 current generation with the children (with respect to `fitness`), and
-then mutate everyone in the population (using `mutate`).
+then mutate everyone in the population (using `mutation!`).
 
 ```julia
 state = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,

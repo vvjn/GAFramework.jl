@@ -16,8 +16,8 @@ To create a GA with a specific GACreature and GAModel, import this module,
 make a GACreature and GAModel with the following interface functions:
     fitness (has default)
     genauxga  (has default)
-    crossover (no default)
-    mutation (has identity function as default)
+    crossover! (no default)
+    mutation! (has identity function as default)
     selection (has default)
     randcreature (no default)
     printfitness (has default)
@@ -43,19 +43,18 @@ fitness(x::GACreature) = x.objvalue
 """
     genauxga(model::GAModel) :: GAModel auxiliary structure
 
-    Given model GAM <: GAModel,
-    generate auxiliary scratch space for calculating alignment scores
+Given model GAM <: GAModel, generate auxiliary scratch space for calculating fitness scores
     model = GAM(G1,G2)
     aux = genauxga(model)
-    """
+The purpose is to not allocate memory every time you calculate fitness for a new creature.    
+"""
 genauxga(model::GAModel) = nothing
 
 """
-    crossover(z::GACreature, x::GACreature,y::GACreature,model::GAModel, aux, rng) :: GACreature
+    crossover!(z::GACreature, x::GACreature,y::GACreature,model::GAModel, aux, rng) :: GACreature
 
-    Crosses over x and y to create a child. Optionally use space in z as a
-    scratch space or to create the child.
-    aux is more scratch space. rng is random number generator.
+Crosses over x and y to create a child. Optionally use space in z as a
+scratch space or to create the child. aux is more scratch space. rng is random number generator.
     model = GAM(G1,G2)
     aux = genauxga(model)
     x = randcreature(model,aux)
@@ -63,13 +62,13 @@ genauxga(model::GAModel) = nothing
     z = randcreature(model,aux)
     child = crossover(z,x,y,model,aux,rng)
 """
-crossover(z::GACreature, x::GACreature, y::GACreature, model::GAModel, st::GAState, aux, rng::AbstractRNG) =
-    error("crossover not implemented for $(typeof(z)) and $(typeof(model))")
+crossover!(z::GACreature, x::GACreature, y::GACreature, st::GAState, aux, rng::AbstractRNG) =
+    error("crossover not implemented for $(typeof(z)) and $(typeof(st.model))")
 
 """
     Mutates a incoming creature and outputs mutated creature
 """
-mutation(creature::GACreature, model::GAModel, st::GAState, aux, rng::AbstractRNG) = creature
+mutation!(creature::GACreature, st::GAState, aux, rng::AbstractRNG) = creature
 
 """
     selection(pop::Vector{<:GACreature}, n::Integer, rng)
@@ -79,33 +78,59 @@ mutation(creature::GACreature, model::GAModel, st::GAState, aux, rng::AbstractRN
     selected parents.
     Uses binary tournament selection by default. 
 """    
-selection(pop::Vector{<:GACreature}, n::Integer, rng) =
-    selection(TournamentSelection(2), pop, n, rng)
+selection(pop::Vector, n::Integer, st::GAState, rng::AbstractRNG) =
+    selection(TournamentSelection(2), pop, n, st, rng)
 
 """
     randcreature(model::GAModel, aux)
 
     Create a random instance of a GACreature, given a GAModel.
     There is always a GACreature associated with a GAModel    
-    """    
+"""    
 randcreature(model::GAModel, aux, rng::AbstractRNG) =
     error("randcreature not implemented for $(typeof(model))")
 
 """
-   Print fitness
-"""        
-printfitness(curgen::Integer, creature::GACreature) =
-    println("curgen: $curgen fitness: $(creature.objvalue)")
+Logging
+    * saves state every save_state_iter iterations to file
+        - restart using state = loadgastate(filename) & ga!(state)
+    * outputs creature every save_creature_iter iterations to file
+    * prints fitness value every print_fitness_iter iterations to screen
 
+    print the fitness of fittest creature every n iteration
+        print_fitness_iter::Int
+    save the fittest creature to file every n iteration
+        save_creature_iter::Int
+    save the entire state of the GA (i.e. this struct) to file every n iteration
+        save_state_iter::Int
+    prefix for the files to be save
+        file_name_prefix::AbstractString
 """
-   Saves best fitness creature to file
-"""
-savecreature(file_name_prefix::AbstractString, curgen::Integer,
-    creature::GACreature, model::GAModel) =
-    save("$(file_name_prefix)_creature_$(curgen).jld", "creature", creature)
+printfitness(curgen::Int, x::GACreature) =
+    println("curgen: $(curgen) fitness: $(x.objvalue)")
+savecreature(file_name_prefix::AbstractString, curgen::Int, x::GACreature) =
+    save("$(file_name_prefix)_creature_$(curgen).jld", "creature", x)
+
+stopcondition(st::GAState) = st.curgen > st.ngen
 
 include("selections.jl")
 
 include("coordinatega.jl")
+
+function logiteration(st::GAState)
+    creature = st.pop[1]
+    gp = st.params
+    file_name_prefix = get(gp, :file_name_prefix, "gamodel")
+    if get(gp, :print_fitness_iter, 1) > 0 && mod(st.curgen, get(gp, :print_fitness_iter,1)) == 0
+        printfitness(st.curgen, creature)
+    end
+    if get(gp, :save_creature_iter, 0) > 0 && mod(st.curgen, get(gp, :save_creature_iter, 0)) == 0
+        savecreature(file_name_prefix, st.curgen, creature)
+    end
+    if get(gp, :save_state_iter, 0) > 0 && mod(st.curgen, get(gp, :save_state_iter, 0)) == 0
+        filename = "$(file_name_prefix)_state_$(st.curgen).jld"
+        save(filename, "state", st)
+    end
+end
 
 end
