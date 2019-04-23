@@ -1,12 +1,25 @@
 import Future
-import Base.Threads: @threads
-#macro threads(ex) :($(esc(ex))) end
+#import Base.Threads: @threads
+
+dothreads = false
 
 function setthreads(p)
-    if p
-        eval(GAFramework, :( macro threads(ex) :($(esc(ex))) end ))
+    global dothreads = p
+end
+
+macro threads(ex)
+    if ex.head === :for
+        ret = quote
+            global dothreads
+            if dothreads
+                Threads.@threads($ex)
+            else
+                $ex
+            end
+        end
+        esc(ret)
     else
-        eval(GAFramework, :( macro threads(ex) :($(esc(ex))) end ))
+        throw(ArgumentError("unrecognized argument to @threads"))
     end
 end
 
@@ -79,6 +92,8 @@ struct GAIterable
     rngs :: Vector
 end
 
+# Create space to store children
+# as well as auxiliary space and rngs for each thread
 function GAIterable(st::GAState)
     nelites = Int(floor(st.elite_fraction * st.npop))
     nchildren = st.npop - nelites
@@ -142,6 +157,6 @@ end
 function ga!(st::GAState)  
     println("Running genetic algorithm with population size $(st.npop), generation number $(st.ngen), elite fraction $(st.elite_fraction).")
     it = GAIterable(st)
-    foreach(identity, it)
+    for _ in it; end
     st.pop[1]
 end

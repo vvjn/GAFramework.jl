@@ -9,7 +9,7 @@ export CoordinateCreature, FunctionModel, SumModel
 
 # This is a CoordinateCreature, T is some coordinate type like Vector
 # and objvalue is some objective value
-struct CoordinateCreature{T} <: GACreature
+struct CoordinateCreature{T}
     value :: T
     objvalue :: Float64
 end
@@ -106,11 +106,6 @@ function crossover!(z::CoordinateCreature,
     x::CoordinateCreature, y::CoordinateCreature,
     st::GAState{SumModel{T}}, aux, rng::AbstractRNG) where {T}
     crossover!(TwoPointCrossover(), z, x, y, st, aux, rng)
-end
-
-function selection(pop::Vector, n::Integer,
-    st::GAState{SumModel{T}}, rng::AbstractRNG) where {T}
-    selection(TournamentSelection(2), pop, n, rng)
 end
 
 # The following is the FunctionModel
@@ -246,7 +241,7 @@ saprob(diff::Real, temp::Real) = exp(diff / temp)
 
 function selection(pop::Vector, n::Integer,
     st::GAState{FunctionModel{F,T}}, rng::AbstractRNG) where {F,T}
-    selection(TournamentSelection(2), pop, n, rng)
+    selection(TournamentSelection(2), pop, n, st, rng)
 end
 
 end # CoordinateGA

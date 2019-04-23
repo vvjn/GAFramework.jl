@@ -5,15 +5,15 @@ module GAFramework
 using Random
 using FileIO
 
-export GAModel, GACreature, ga!,
-fitness, genauxga, crossover, mutation, selection, randcreature,
+export GAModel, ga!,
+fitness, genauxga, crossover!, mutation!, selection, randcreature,
 printfitness, savecreature,
 GAState, GAIterable, loadgastate, savegastate,
 RouletteWheelSelection, TournamentSelection
 
 """
-To create a GA with a specific GACreature and GAModel, import this module,
-make a GACreature and GAModel with the following interface functions:
+To create a GA with a specific GAModel, import this module,
+make a GAModel with the following interface functions:
     fitness (has default)
     genauxga  (has default)
     crossover! (no default)
@@ -23,7 +23,6 @@ make a GACreature and GAModel with the following interface functions:
     printfitness (has default)
     savecreature (has default)
  """
-abstract type GACreature end
 abstract type GAModel end
 
 include("ga.jl")
@@ -38,7 +37,7 @@ Fitness function.
     all the computationally expensive part of calculating the fitness value should
     be implemented in the randcreature method.
 """
-fitness(x::GACreature) = x.objvalue
+fitness(x) = x.objvalue
 
 """
     genauxga(model::GAModel) :: GAModel auxiliary structure
@@ -51,7 +50,7 @@ The purpose is to not allocate memory every time you calculate fitness for a new
 genauxga(model::GAModel) = nothing
 
 """
-    crossover!(z::GACreature, x::GACreature,y::GACreature,model::GAModel, aux, rng) :: GACreature
+    crossover!(z, x,y, model::GAModel, aux, rng)
 
 Crosses over x and y to create a child. Optionally use space in z as a
 scratch space or to create the child. aux is more scratch space. rng is random number generator.
@@ -62,16 +61,16 @@ scratch space or to create the child. aux is more scratch space. rng is random n
     z = randcreature(model,aux)
     child = crossover(z,x,y,model,aux,rng)
 """
-crossover!(z::GACreature, x::GACreature, y::GACreature, st::GAState, aux, rng::AbstractRNG) =
+crossover!(z, x, y, st::GAState, aux, rng::AbstractRNG) =
     error("crossover not implemented for $(typeof(z)) and $(typeof(st.model))")
 
 """
     Mutates a incoming creature and outputs mutated creature
 """
-mutation!(creature::GACreature, st::GAState, aux, rng::AbstractRNG) = creature
+mutation!(creature, st::GAState, aux, rng::AbstractRNG) = creature
 
 """
-    selection(pop::Vector{<:GACreature}, n::Integer, rng)
+    selection(pop::Vector, n::Integer, rng)
 
     Generate a vector of n tuples (i,j) where i and j are
     indices into pop, and where pop[i] and pop[j] are the
@@ -84,8 +83,8 @@ selection(pop::Vector, n::Integer, st::GAState, rng::AbstractRNG) =
 """
     randcreature(model::GAModel, aux)
 
-    Create a random instance of a GACreature, given a GAModel.
-    There is always a GACreature associated with a GAModel    
+    Create a random instance of a creature, given a GAModel.
+    There is always a creature associated with a GAModel    
 """    
 randcreature(model::GAModel, aux, rng::AbstractRNG) =
     error("randcreature not implemented for $(typeof(model))")
@@ -106,9 +105,9 @@ Logging
     prefix for the files to be save
         file_name_prefix::AbstractString
 """
-printfitness(curgen::Int, x::GACreature) =
-    println("curgen: $(curgen) fitness: $(x.objvalue)")
-savecreature(file_name_prefix::AbstractString, curgen::Int, x::GACreature) =
+printfitness(curgen::Int, x) =
+    println("curgen: $(curgen) fitness: $(fitness(x))")
+savecreature(file_name_prefix::AbstractString, curgen::Int, x) =
     save("$(file_name_prefix)_creature_$(curgen).jld", "creature", x)
 
 stopcondition(st::GAState) = st.curgen > st.ngen
@@ -116,6 +115,7 @@ stopcondition(st::GAState) = st.curgen > st.ngen
 include("selections.jl")
 
 include("coordinatega.jl")
+include("permga.jl")
 
 function logiteration(st::GAState)
     creature = st.pop[1]
