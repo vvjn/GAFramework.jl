@@ -54,7 +54,7 @@ box, so that our solutions will be inside the box;
 otherwise, our solutions will not be constrained.
 
 ```julia
-immutable CoordinateModel{F,T} <: GAModel
+struct CoordinateModel{F,T} <: GAModel
     f::F
     xmin::T
     xmax::T
@@ -74,7 +74,7 @@ function (`objvalue` field). We calculate the objective value when creating a
 `CoordinateCreature{T}` object.
 
 ```julia
-immutable CoordinateCreature{T} <: GACreature
+struct CoordinateCreature{T} <: GACreature
     value :: T
     objvalue :: Float64
 end
@@ -185,6 +185,8 @@ Or, we want to minimize the function `<x, sin(1/x)>` in 2D
 Euclidean space over the `[-1,1]^2` rectangle.
 
 ```julia
+using LinearAlgebra
+
 model = CoordinateModel(x -> any(x.==0) ? 0.0 : dot(x, sin.(1./x)),
                          [-1.,-1.], [1.,1.])
 ```
@@ -193,6 +195,8 @@ Or, we want to minimize the function `|x - (0.25,0.25,0.5,0.5,0.5)|_1` in
 5-dimensional Euclidean space over the `[-1,1]^5` box.
 
 ```julia
+using LinearAlgebra
+
 x0 = [0.25,0.25,0.5,0.5,0.5]
 model = CoordinateModel(x -> norm(x-x0,1),
                          [-1.,-1.,-1.,-1.,-1], # minimum corner
@@ -245,7 +249,7 @@ can replicate a GA run using the `baserng` option and by using only the random n
 generators provided by the functions to generate random numbers. Setting `baserng` to be an 
 object that is a sub-type of `AbstractRNG`
 will percolate it throughout the GA, allowing us to replicate a run. By default, `baserng` is
-set to `Base.GLOBAL_RNG`.
+set to `MersenneTwister()`.
 
 ```julia
 state1 = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,

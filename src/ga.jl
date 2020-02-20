@@ -7,7 +7,7 @@ import Base.Threads: @threads
    function to create a population for GAState or ga
 """
 function initializepop(model::GAModel,npop::Integer,
-                       nelites::Integer, baserng=Random.GLOBAL_RNG, sortpop=true)
+                       nelites::Integer, baserng::MersenneTwister, sortpop=true)
     # each thread gets its own auxiliary scratch space
     # and each thread gets its own random number generator
     nthreads = Threads.nthreads()
@@ -71,7 +71,7 @@ function GAState(model::GAModel;
                  save_creature_iter=0,
                  save_state_iter=0,
                  file_name_prefix="gamodel",
-                 baserng=Random.GLOBAL_RNG)
+                 baserng=MersenneTwister())
     0 <= elite_fraction <= 1 || error("elite_fraction bounds")
     nelites = Int(floor(elite_fraction*npop))
     pop,aux,rngs = initializepop(model, npop, nelites, baserng)
