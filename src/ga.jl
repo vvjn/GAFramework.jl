@@ -1,6 +1,6 @@
 import Future
 
-dothreads = false
+dothreads = Threads.nthreads() > 1
 
 function setthreads(p::Bool)
     global dothreads = p
@@ -58,8 +58,6 @@ mutable struct GAState{GAM <: GAModel}
     pop::Vector
     # number of generations
     ngen::Int
-    # size of the population
-    npop::Int
     # fraction of population that goes to the next generation regardless
     elite_fraction::Real
     # parameters for mutation!, crossover!, selection, logiteration, etc.
@@ -78,7 +76,7 @@ function GAState(model::GAM;
 
     (pop, aux, rngs) = initializepop(model, npop, nelites, baserng)
 
-    return GAState{GAM}(model, pop, ngen, npop, elite_fraction,
+    return GAState{GAM}(model, pop, ngen, elite_fraction,
         merge(DEFAULT_GASTATE_PARAMS, params), baserng, 0)
 end
 
@@ -92,8 +90,8 @@ end
 # Create space to store children
 # as well as auxiliary space and rngs for each thread
 function GAIterable(st::GAState)
-    nelites = Int(floor(st.elite_fraction * st.npop))
-    nchildren = st.npop - nelites
+    nelites = Int(floor(st.elite_fraction * length(st.pop)))
+    nchildren = length(st.pop) - nelites
     (children, aux, rngs) = initializepop(st.model, nchildren, 0, st.baserng, false)
     GAIterable(st, children, aux, rngs)
 end
@@ -113,8 +111,8 @@ function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
     end
     st.curgen += 1
 
-    nelites = Int(floor(st.elite_fraction * st.npop))
-    nchildren = st.npop - nelites
+    nelites = Int(floor(st.elite_fraction * length(st.pop)))
+    nchildren = length(st.pop) - nelites
     # main loop:
     # 1. select parents
     # 2. crossover parents & create children
@@ -138,7 +136,7 @@ function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
 
     # mutate pop, including elites (except for the most elite creature,
     # so that monotonocity of best fitness wrt generation number is preserved)
-    @threads for i = 2:st.npop
+    @threads for i = 2:length(st.pop)
         threadid = Threads.threadid()
         st.pop[i] = mutation!(st.pop[i], st, it.aux[threadid], it.rngs[threadid])
     end
@@ -148,7 +146,7 @@ function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
 end
 
 function ga!(st::GAState)  
-    println("Running genetic algorithm with population size $(st.npop), generation number $(st.ngen), elite fraction $(st.elite_fraction).")
+    println("Running genetic algorithm with population size $(length(st.pop)), generation number $(st.ngen), elite fraction $(st.elite_fraction).")
     it = GAIterable(st)
     for _ in it
         logiteration(st)

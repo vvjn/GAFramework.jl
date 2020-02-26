@@ -29,4 +29,4 @@ git:
 #  - julia -e 'Pkg.clone(pwd()); Pkg.build("GAFramework"); Pkg.test("GAFramework"; coverage=true)'
 after_success:
   # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("GAFramework")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'using Pkg; import GAFramework; cd(dirname(dirname(pathof(GAFramework)))); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'

@@ -1,6 +1,6 @@
 struct RouletteWheelSelection end
 function selection(::RouletteWheelSelection,
-    pop::Vector, n::Integer, st::GAState, rng::AbstractRNG=Base.GLOBAL_RNG)    
+    pop::Vector, n::Integer, st::GAState, rng::AbstractRNG)    
     wmin,wmax = extrema(fitness(c) for c in pop)
     weight = wmax - wmin
     function stochasticpick()
@@ -28,7 +28,7 @@ struct TournamentSelection
     TournamentSelection(k=2) = new(k)
 end
 function selection(sel::TournamentSelection,
-    pop::Vector, n::Integer, st::GAState, rng::AbstractRNG=Base.GLOBAL_RNG)    
+    pop::Vector, n::Integer, st::GAState, rng::AbstractRNG)    
     function stochasticpick()
         si = rand(rng,1:length(pop))
         weighti = fitness(pop[si])

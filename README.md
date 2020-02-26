@@ -213,8 +213,7 @@ then mutate everyone in the population (using `mutation!`).
 
 ```julia
 state = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
-                       mutation_params=Dict(:rate=>0.1),
-                       print_fitness_iter=10)
+    params = Dict(:mutation_rate =>0.1, :print_fitness_iter => 10))
 ```
 
 This runs the GA and we are done.
@@ -251,13 +250,13 @@ set to `MersenneTwister(rand(UInt))`.
 
 ```julia
 state1 = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
-                       mutation_params=Dict(:rate=>0.1),
-                       print_fitness_iter=10, baserng=MersenneTwister(12))
+    params = Dict(:mutation_rate => 0.1, :print_fitness_iter => 10),
+    baserng=MersenneTwister(12))
 best1 = ga!(state1)
 
 state2 = GAState(model, ngen=100, npop=1000, elite_fraction=0.01,
-                       mutation_params=Dict(:rate=>0.1),
-                       print_fitness_iter=10, baserng=MersenneTwister(12))
+    params = Dict(:mutation_rate => 0.1, :print_fitness_iter => 10),
+    baserng=MersenneTwister(12))
 best2 = ga!(state2)
 
 println(all([getfield(state1,x) == getfield(state2,x) for x in fieldnames(GAState)]))
@@ -272,8 +271,8 @@ We can save the creature to file every 10 iterations using the following.
 
 ```julia
 state = GAState(m, ngen=100, npop=1000, elite_fraction=0.01,
-                mutation_params=Dict(:rate=>0.1), print_fitness_iter=10,
-                save_creature_iter=10, file_name_prefix="minexp_6000")
+    params = Dict(:mutation_rate => 0.1, :print_fitness_iter => 10,
+        :save_creature_iter => 10, :file_name_prefix="minexp_6000"))
 ```
 
 After we finish a GA run using `ga!(state)`, and we decide that we
@@ -292,8 +291,8 @@ work for other types that do not contain functions.
 
 ```julia
 state = GAState(m, ngen=100, npop=1000, elite_fraction=0.01,
-                mutation_params=Dict(:rate=>0.1), print_fitness_iter=10,
-                save_state_iter=100, file_name_prefix="minexp_6000")
+    params = Dict(:mutation_rate => 0.1, :print_fitness_iter => 10,
+        :save_creature_iter => 100, :file_name_prefix="minexp_6000"))
 ```
 
 If something happens during the middle of running `ga!(state)`, we can
