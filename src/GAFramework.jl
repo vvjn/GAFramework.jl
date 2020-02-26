@@ -25,6 +25,12 @@ make a GAModel with the following interface functions:
  """
 abstract type GAModel end
 
+const DEFAULT_GASTATE_PARAMS = Dict(:mutation_rate=>0.1,
+    :print_fitness_iter=>1,
+    :save_creature_iter=>0,
+    :save_state_iter=>0,
+    :file_name_prefix=>"gamodel")
+
 include("ga.jl")
 
 """
@@ -112,6 +118,20 @@ savecreature(file_name_prefix::AbstractString, curgen::Int, x) =
 
 stopcondition(st::GAState) = st.curgen > st.ngen
 
+"""
+    Saves ga state to file
+"""       
+function savegastate(file_name_prefix::AbstractString, curgen::Integer, state::GAState)
+    filename = "$(file_name_prefix)_state_$(curgen).bson"
+    println("Saving state to file $filename")
+    save(filename,"state", state)
+end
+
+function loadgastate(filename::AbstractString)
+    println("Load state from file $filename")
+    load(filename, "state")
+end
+
 include("selections.jl")
 
 include("coordinatega.jl")
@@ -120,15 +140,15 @@ include("permga.jl")
 function logiteration(st::GAState)
     creature = st.pop[1]
     gp = st.params
-    file_name_prefix = get(gp, :file_name_prefix, "gamodel")
-    if get(gp, :print_fitness_iter, 1) > 0 && mod(st.curgen, get(gp, :print_fitness_iter,1)) == 0
+    file_name_prefix = gp[:file_name_prefix]
+    if gp[:print_fitness_iter] > 0 && mod(st.curgen, gp[:print_fitness_iter]) == 0
         printfitness(st.curgen, creature)
     end
-    if get(gp, :save_creature_iter, 0) > 0 && mod(st.curgen, get(gp, :save_creature_iter, 0)) == 0
+    if gp[:save_creature_iter] > 0 && mod(st.curgen, gp[:save_creature_iter]) == 0
         savecreature(file_name_prefix, st.curgen, creature)
     end
-    if get(gp, :save_state_iter, 0) > 0 && mod(st.curgen, get(gp, :save_state_iter, 0)) == 0
-        filename = "$(file_name_prefix)_state_$(st.curgen).jld"
+    if gp[:save_state_iter] > 0 && mod(st.curgen, gp[:save_state_iter]) == 0
+        filename = "$(file_name_prefix)_state_$(st.curgen).bson"
         save(filename, "state", st)
     end
 end

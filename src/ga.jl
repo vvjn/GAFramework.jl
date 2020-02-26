@@ -1,9 +1,8 @@
 import Future
-#import Base.Threads: @threads
 
 dothreads = false
 
-function setthreads(p)
+function setthreads(p::Bool)
     global dothreads = p
 end
 
@@ -27,7 +26,7 @@ end
 Creates initial population as well as auxiliary structures for GA.
 """
 function initializepop(model::GAModel, npop::Integer,
-    nelites::Integer, baserng=Random.GLOBAL_RNG, sortpop=true)
+    nelites::Integer, baserng::MersenneTwister, sortpop::Bool=true)
     # each thread gets its own auxiliary scratch space
     # and each thread gets its own random number generator
     nthreads = Threads.nthreads()
@@ -72,17 +71,15 @@ mutable struct GAState{GAM <: GAModel}
 end
 function GAState(model::GAM;
     ngen=10, npop=100, elite_fraction=0.01,
-    params=Dict(:mutation_rate=>0.1,
-        :print_fitness_iter=>1,
-        :save_creature_iter=>0,
-        :save_state_iter=>0,
-        :file_name_prefix=>"gamodel"),
-    baserng=Random.GLOBAL_RNG) where {GAM <: GAModel}
+    params=Dict(),
+    baserng=MersenneTwister(rand(UInt))) where {GAM <: GAModel}
     0 <= elite_fraction <= 1 || error("elite_fraction bounds")
     nelites = Int(floor(elite_fraction*npop))
-    pop,aux,rngs = initializepop(model, npop, nelites, baserng)
+
+    (pop, aux, rngs) = initializepop(model, npop, nelites, baserng)
+
     return GAState{GAM}(model, pop, ngen, npop, elite_fraction,
-        params, baserng, 0)
+        merge(DEFAULT_GASTATE_PARAMS, params), baserng, 0)
 end
 
 struct GAIterable
@@ -147,16 +144,14 @@ function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
     end
     sort!(st.pop, by=fitness, rev=true, alg=PartialQuickSort(max(1,nelites)))
 
-    logiteration(st)
-
-    # @assert map(x -> CoordinateGA.CoordinateCreature(x.value, st.model).objvalue, st.pop) ≈ map(x -> x.objvalue, st.pop)
-
-    st, iteration+1
+    st.pop[1], iteration+1
 end
 
 function ga!(st::GAState)  
     println("Running genetic algorithm with population size $(st.npop), generation number $(st.ngen), elite fraction $(st.elite_fraction).")
     it = GAIterable(st)
-    for _ in it; end
+    for _ in it
+        logiteration(st)
+    end
     st.pop[1]
 end
