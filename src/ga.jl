@@ -74,7 +74,7 @@ function GAState(model::GAM;
     0 <= elite_fraction <= 1 || error("elite_fraction bounds")
     nelites = Int(floor(elite_fraction*npop))
 
-    (pop, aux, rngs) = initializepop(model, npop, nelites, baserng)
+    (pop, _, _) = initializepop(model, npop, nelites, baserng)
 
     return GAState{GAM}(model, pop, ngen, elite_fraction,
         merge(DEFAULT_GASTATE_PARAMS, params), baserng, 0)
@@ -111,8 +111,8 @@ function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
     end
     st.curgen += 1
 
-    nelites = Int(floor(st.elite_fraction * length(st.pop)))
-    nchildren = length(st.pop) - nelites
+    nchildren = length(it.children)
+    nelites = length(st.pop) - nchildren
     # main loop:
     # 1. select parents
     # 2. crossover parents & create children

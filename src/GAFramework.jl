@@ -22,6 +22,7 @@ make a GAModel with the following interface functions:
     randcreature (no default)
     printfitness (has default)
     savecreature (has default)
+    stopcondition (has default)
  """
 abstract type GAModel end
 
@@ -114,7 +115,7 @@ Logging
 printfitness(curgen::Int, x) =
     println("curgen: $(curgen) fitness: $(fitness(x))")
 savecreature(file_name_prefix::AbstractString, curgen::Int, x) =
-    save("$(file_name_prefix)_creature_$(curgen).jld", "creature", x)
+    save("$(file_name_prefix)_creature_$(curgen).bson", "creature", x)
 
 stopcondition(st::GAState) = st.curgen > st.ngen
 
