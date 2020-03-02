@@ -21,70 +21,6 @@ function expandstorage!(A::SparseMatrixCSC, maxstored)
     return maxstored
 end
 
-# map!(f, C, A, B[h,h][1:size(A,1),1:size(A,1)]), where size(C) == size(A)
-# NOTE: This version assumes that all values in A are one value and similar for B
-function map_index!(f, C::SparseMatrixCSC, A::SparseMatrixCSC, B::SparseMatrixCSC,
-    h::AbstractVector, hinv::AbstractVector, hinvrowvals::AbstractVector)
-
-    (length(hinvrowvals) < length(rowvals(B))) && error("length hinvrowvals")
-    @inbounds for hi in 1:length(rowvals(B))
-        hinvrowvals[hi] = hinv[rowvals(B)[hi]]
-    end
-    @inbounds for j in 1:size(C,2)
-        Bk, stopBk = colstartind(B, j), colboundind(B, j)
-        sort!(hinvrowvals, Bk, stopBk-1, QuickSort, Base.Order.Forward)
-    end
-
-    spaceC::Int = min(length(rowvals(C)), length(nonzeros(C)))
-    rowsentinelA = convert(indtype(A), size(C,1) + 1)
-    rowsentinelB = convert(indtype(B), size(C,1) + 1)
-    Ck = 1
-    @inbounds for j in 1:size(C,2)
-        bj = h[j]
-        setcolptr!(C, j, Ck)
-        Ak, stopAk = colstartind(A, j), colboundind(A, j)
-        Bk, stopBk = colstartind(B, bj), colboundind(B, bj)
-        Ai = Ak < stopAk ? rowvals(A)[Ak] : rowsentinelA
-
-        rowBi = 1
-        rowBBk = hinvrowvals[Bk:stopBk-1] # sort(hinv[rowvals(B)[Bk:stopBk-1]])
-        #Bi = Bk < stopBk ? hinv[rowvals(B)[Bk]] : rowsentinelB
-        Bi = Bk < stopBk ? rowBBk[rowBi] : rowsentinelB
-        while true
-            if Ai == Bi
-                Ai == rowsentinelA && break # column complete
-                Cx, Ci::indtype(C) = f(nonzeros(A)[Ak], nonzeros(B)[Bk]), Ai
-                Ak += oneunit(Ak); Ai = Ak < stopAk ? rowvals(A)[Ak] : rowsentinelA
-                #Bk += oneunit(Bk); Bi = Bk < stopBk ? hinv[rowvals(B)[Bk]] : rowsentinelB
-                Bk += oneunit(Bk); rowBi += 1; Bi = Bk < stopBk ? rowBBk[rowBi] : rowsentinelB
-            elseif Ai < Bi
-                Cx, Ci = f(nonzeros(A)[Ak], zero(eltype(B))), Ai
-                Ak += oneunit(Ak); Ai = Ak < stopAk ? rowvals(A)[Ak] : rowsentinelA
-            else # Bi < Ai
-                Cx, Ci = f(zero(eltype(A)), nonzeros(B)[Bk]), Bi
-                #Bk += oneunit(Bk); Bi = Bk < stopBk ? hinv[rowvals(B)[Bk]] : rowsentinelB
-                Bk += oneunit(Bk); rowBi += 1; Bi = Bk < stopBk ? rowBBk[rowBi] : rowsentinelB
-            end
-            # NOTE: The ordering of the conditional chain above impacts which matrices this
-            # method performs best for. In the map situation (arguments have same shape, and
-            # likely same or similar stored entry pattern), the Ai == Bi and termination
-            # cases are equally or more likely than the Ai < Bi and Bi < Ai cases.
-            if !iszero(Cx)
-                if Ck > spaceC
-                    error("Ck > spaceC")
-                    spaceC = expandstorage!(C, Ck + (nnz(A) - (Ak - 1)) + (nnz(B) - (Bk - 1)))
-                end
-                rowvals(C)[Ck] = Ci
-                nonzeros(C)[Ck] = Cx
-                Ck += 1
-            end
-        end
-    end
-    @inbounds setcolptr!(C, size(C,2) + 1, Ck)
-    # trimstorage!(C, Ck - 1)
-    return C
-end
-
 # map!(+, C, A, B[h,h][1:size(A,1),1:size(A,1)]), where size(C) == size(A)
 # This version assumes that all values in A and B are the value 1
 function map_index_plus!(C::SparseMatrixCSC, A::SparseMatrixCSC, B::SparseMatrixCSC,
@@ -207,9 +143,14 @@ fitness(x::NetalCreature) where {T} = x.score
 
 function crossover!(::CayleyCrossover, z::P, x::P, y::P,
     st::GAState, aux, rng::AbstractRNG) where {P <: NetalCreature}
-    rdivperm!(z.f, x.f, y.f) # r = p q^-1
-    halfperm!(z.f, rng)
-    z.f[:] = z.f[y.f] # permute!(z.f, y.f) # 
+    (_, (r, visited)) = aux
+    visited .= false
+    rdivperm!(r, x.f, y.f) # r = p q^-1
+    halfperm!(r, rng, visited)
+    # z.f[:] = r[y.f] # permute!(z.f, y.f) #
+    @inbounds for i in 1:length(r)
+        z.f[i] = r[y.f[i]]
+    end
     NetalCreature(z.f, st.model, aux)
 end
 
@@ -219,7 +160,7 @@ printfitness(curgen::Int, x::NetalCreature) =
 """
 Model to find network alignment by optimizing S3 (see MAGNA paper)
 A network alignment is represented using a permutation
-Slow implementation but fine  for small graphs
+Faster implementation, slightly slower than the C++ code from the MAGNA++ paper
     using GAFramework, GAFramework.NetalGA
     using LightGraphs
     using Random
@@ -290,14 +231,15 @@ end
 """
 
 function genauxga(m::NetalModel)
-    Spmap.map_index_aux(m.G1, m.G2)
+    crossover_aux = randperm(size(m.G2,1)), fill(false, size(m.G2,1))
+    Spmap.map_index_aux(m.G1, m.G2), crossover_aux
 end
 
 # aux = genauxga(..) can be used to reduce allocations here
 # by using auxiliary space instead of reallocating
 function NetalCreature(h, m::NetalModel, aux)
     # Assumes that all edge weights are 1
-    K, hinv, hinvrowvals = aux
+    ((K, hinv, hinvrowvals), _) = aux
     Spmap.plus_getindex!(K, m.G1, m.G2, h, hinv, hinvrowvals) # K = G1 + G2[h,h][1:m,1:m]
     
     w = nonzeros(K)
@@ -311,7 +253,7 @@ function NetalCreature(h, m::NetalModel, aux)
 end
 
 function randcreature(m::NetalModel, aux, rng::AbstractRNG) where {T}
-    f = randperm(size(m.G2,1))
+    f = randperm(rng, size(m.G2,1))
     NetalCreature(f, m, aux)
 end
 
@@ -321,4 +263,3 @@ function crossover!(z, x, y,
 end
 
 end # NetalGA
-

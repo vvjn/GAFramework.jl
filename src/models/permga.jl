@@ -19,8 +19,7 @@ struct CayleyCrossover end
 # See MAGNA network alignment paper
 # for each cycle in permutation
 # cut off half off the cycle
-function halfperm!(r, rng)
-    visited = fill(false,length(r))
+function halfperm!(r, rng, visited = fill(false,length(r)))    
     i = 1
     while i <= length(r)
         if visited[i]
@@ -114,7 +113,7 @@ end
 function PermCreature(f, m::NetalignModel)
     # Assumes that all edge weights are 1
     h = f[1:size(m.G1,1)] # view(f, 1:size(m.G1,1))
-    K = m.G1 + m.G2[h,h]
+    K = m.G1 + m.G2[f,f][1:size(m.G1,1), 1:size(m.G1,1)]
     w = nonzeros(K)
     Nc = count(x->x==2, w)
     Nn = length(w) - Nc
@@ -126,7 +125,7 @@ function PermCreature(f, m::NetalignModel)
 end
 
 function randcreature(m::NetalignModel, aux, rng::AbstractRNG) where {T}
-    f = randperm(size(m.G2,1))
+    f = randperm(rng, size(m.G2,1))
     PermCreature(f, m)
 end
 

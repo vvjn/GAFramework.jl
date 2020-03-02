@@ -71,6 +71,7 @@ function GAState(model::GAM;
     ngen=10, npop=100, elite_fraction=0.01,
     params=Dict(),
     rng=MersenneTwister(rand(UInt))) where {GAM <: GAModel}
+    npop > 1 || error("population size needs to be more than 1")
     0 <= elite_fraction <= 1 || error("elite_fraction bounds")
     nelites = Int(floor(elite_fraction*npop))
 
