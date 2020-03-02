@@ -135,8 +135,9 @@ end
 
 include("selections.jl")
 
-include("coordinatega.jl")
-include("permga.jl")
+include("models/coordinatega.jl")
+include("models/permga.jl")
+include("models/netalga.jl")
 
 function logiteration(st::GAState)
     creature = st.pop[1]

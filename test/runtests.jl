@@ -5,6 +5,7 @@ using SparseArrays
 using GAFramework
 using GAFramework.CoordinateGA
 using GAFramework.PermGA
+using GAFramework.NetalGA
 
 function test1()
     model = FunctionModel(x -> x[1]==0.0 ? 0.0 : x[1] * sin(1/x[1]), [-1.0], [1.0])
@@ -57,7 +58,21 @@ function test4()
     fitness(best) == 1
 end
 
+function test5()
+    rows = [3, 4, 5, 7, 9, 3, 7, 8, 9, 10, 1, 2, 6, 7, 8, 1, 6, 1, 6, 7, 9, 10, 3, 4, 5, 8, 1, 2, 3, 5, 9, 2, 3, 6, 1, 2, 5, 7, 2, 5]
+    cols = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 9, 10, 10]
+    G1 = sparse(rows, cols, ones(length(rows)))
+    perm = [3, 2, 4, 8, 6, 1, 5, 10, 9, 7]
+    G2 = G1[invperm(perm),invperm(perm)]
+    model = NetalModel(G1,G2)
+    st = GAState(model, ngen=100, npop=6_000, elite_fraction=0.1,
+        params = Dict(:print_fitness_iter=>20))
+    best = ga!(st)
+    fitness(best) == 1
+end
+
 @test test1()
 @test test2()
 @test test3()
 @test test4()
+@test test5()

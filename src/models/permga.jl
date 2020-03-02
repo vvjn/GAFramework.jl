@@ -79,17 +79,29 @@ Slow implementation but fine  for small graphs
     using GAFramework, GAFramework.PermGA
     using LightGraphs
     using Random
-    mv = 20
-    me = 40
-    G1 = adjacency_matrix(LightGraphs.erdos_renyi(mv,me))
-    perm = randperm(mv)
-    G2 = G1[invperm(perm),invperm(perm)]
+    mv1 = 8
+    me1 = 15
+    mv2 = 10
+    me2 = 15
+    G2 = adjacency_matrix(LightGraphs.erdos_renyi(mv2,me2))
+    perm = randperm(mv2)
+    G1 = G2[perm[1:mv1],perm[1:mv1]]
     # G1.|V| <= G2.|V|
     model = NetalignModel(G1,G2)
     st = GAState(model, ngen=100, npop=6_000, elite_fraction=0.1,
         params=Dict(:print_fitness_iter=>1))
     ga!(st)
-    println("accuracy = ", sum(st.pop[1].f .== perm)/mv)
+    println("accuracy = ", sum(st.pop[1].f[1:mv1] .== perm[1:mv1])/mv1)
+
+    G2 = sparse([1, 1, 2, 3, 4], [2, 3, 3, 4, 5], ones(Int,5), 5, 5) 
+    G2 = min.(1, (G2 + G2')) 
+    G1 = G2[1:4,1:4]
+    model = NetalignModel(G1,G2)
+    st = GAState(model, ngen=100, npop=6_000, elite_fraction=0.1,
+        params=Dict(:print_fitness_iter=>1))
+    ga!(st)
+    println("accuracy = ", sum(st.pop[1].f[1:4] .== [1,2,3,4])/4)
+    println("accuracy = ", sum(st.pop[1].f[1:4] .== [2,1,3,4])/4)
     st.pop[1], PermCreature(perm, model)
 """
 struct NetalignModel <: GAModel
@@ -101,8 +113,9 @@ end
 # by using auxiliary space instead of reallocating
 function PermCreature(f, m::NetalignModel)
     # Assumes that all edge weights are 1
-    h = view(f, 1:size(m.G1,1))
-    w = nonzeros(m.G1 + m.G2[h,h])
+    h = f[1:size(m.G1,1)] # view(f, 1:size(m.G1,1))
+    K = m.G1 + m.G2[h,h]
+    w = nonzeros(K)
     Nc = count(x->x==2, w)
     Nn = length(w) - Nc
     Nc,cr = divrem(Nc,2)

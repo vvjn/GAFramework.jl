@@ -26,11 +26,11 @@ end
 Creates initial population as well as auxiliary structures for GA.
 """
 function initializepop(model::GAModel, npop::Integer,
-    nelites::Integer, baserng::MersenneTwister, sortpop::Bool=true)
+    nelites::Integer, rng::MersenneTwister, sortpop::Bool=true)
     # each thread gets its own auxiliary scratch space
     # and each thread gets its own random number generator
     nthreads = Threads.nthreads()
-    rngs = accumulate(Future.randjump, fill(big(10)^20, nthreads), init=baserng)
+    rngs = accumulate(Future.randjump, fill(big(10)^20, nthreads), init=rng)
     aux = map(i -> genauxga(model), 1:nthreads)
     if npop > 0
         # initialize population
@@ -63,21 +63,21 @@ mutable struct GAState{GAM <: GAModel}
     # parameters for mutation!, crossover!, selection, logiteration, etc.
     params::Dict
     # random number generator for replication purposes
-    baserng::AbstractRNG
+    rng::AbstractRNG
     # current generation
     curgen::Int
 end
 function GAState(model::GAM;
     ngen=10, npop=100, elite_fraction=0.01,
     params=Dict(),
-    baserng=MersenneTwister(rand(UInt))) where {GAM <: GAModel}
+    rng=MersenneTwister(rand(UInt))) where {GAM <: GAModel}
     0 <= elite_fraction <= 1 || error("elite_fraction bounds")
     nelites = Int(floor(elite_fraction*npop))
 
-    (pop, _, _) = initializepop(model, npop, nelites, baserng)
+    (pop, _, _) = initializepop(model, npop, nelites, rng)
 
     return GAState{GAM}(model, pop, ngen, elite_fraction,
-        merge(DEFAULT_GASTATE_PARAMS, params), baserng, 0)
+        merge(DEFAULT_GASTATE_PARAMS, params), rng, 0)
 end
 
 struct GAIterable
@@ -92,7 +92,7 @@ end
 function GAIterable(st::GAState)
     nelites = Int(floor(st.elite_fraction * length(st.pop)))
     nchildren = length(st.pop) - nelites
-    (children, aux, rngs) = initializepop(st.model, nchildren, 0, st.baserng, false)
+    (children, aux, rngs) = initializepop(st.model, nchildren, 0, st.rng, false)
     GAIterable(st, children, aux, rngs)
 end
 
