@@ -4,7 +4,6 @@ module Spmap
 
 using SparseArrays
 import SparseArrays: indtype, getcolptr, permute_rows!
-import Base: require_one_based_indexing
 using Random
 
 @inline colstartind(A::SparseMatrixCSC, j) = getcolptr(A)[j]
@@ -150,7 +149,6 @@ end
 
 
 function invperm!(b::AbstractVector, a::AbstractVector)
-    Base.require_one_based_indexing(a)
     # b = zero(a) # similar vector of zeros
     b .= 0
     n = length(a)
