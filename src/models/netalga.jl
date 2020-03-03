@@ -3,7 +3,7 @@
 module Spmap
 
 using SparseArrays
-import SparseArrays: indtype, getcolptr, permute_rows!
+import SparseArrays: indtype, getcolptr
 using Random
 
 @inline colstartind(A::SparseMatrixCSC, j) = getcolptr(A)[j]
@@ -198,7 +198,7 @@ end
     G2 = adjacency_matrix(LightGraphs.erdos_renyi(mv,me))
     perm = randperm(mv)
     nv = 75
-    G1 = G2[perm,perm][1:nv,1:nv]
+    G1 = G2[perm[1:nv], perm[1:nv]]
     model1 = NetalModel(G1,G2)
     model2 = NetalignModel(G1,G2)
     aux1 = genauxga(model1)

@@ -112,7 +112,7 @@ Logging
     prefix for the files to be save
         file_name_prefix::AbstractString
 """
-printfitness(curgen::Int, x) =
+printfitness(curgen::Int, x::Any) =
     println("curgen: $(curgen) fitness: $(fitness(x))")
 savecreature(file_name_prefix::AbstractString, curgen::Int, x) =
     save("$(file_name_prefix)_creature_$(curgen).bson", "creature", x)
@@ -138,6 +138,7 @@ include("selections.jl")
 include("models/coordinatega.jl")
 include("models/permga.jl")
 include("models/netalga.jl")
+include("models/magnaga.jl")
 
 function logiteration(st::GAState)
     creature = st.pop[1]

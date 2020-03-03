@@ -113,7 +113,7 @@ end
 function PermCreature(f, m::NetalignModel)
     # Assumes that all edge weights are 1
     h = f[1:size(m.G1,1)] # view(f, 1:size(m.G1,1))
-    K = m.G1 + m.G2[f,f][1:size(m.G1,1), 1:size(m.G1,1)]
+    K = m.G1 + m.G2[h,h]
     w = nonzeros(K)
     Nc = count(x->x==2, w)
     Nn = length(w) - Nc
