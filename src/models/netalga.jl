@@ -26,18 +26,19 @@ end
 function map_index_plus!(C::SparseMatrixCSC, A::SparseMatrixCSC, B::SparseMatrixCSC,
     h::AbstractVector, hinv::AbstractVector, hinvrowvals::AbstractVector)
 
+    spaceC::Int = min(length(rowvals(C)), length(nonzeros(C)))
+    rowsentinelA = convert(indtype(A), size(C,1) + 1)
+    rowsentinelB = convert(indtype(B), size(C,1) + 1)
+
     (length(hinvrowvals) < length(rowvals(B))) && error("length hinvrowvals")
     @inbounds for hi in 1:length(rowvals(B))
-        hinvrowvals[hi] = hinv[rowvals(B)[hi]]
+        hinvrowvals[hi] = min(rowsentinelB, hinv[rowvals(B)[hi]])
     end
-    @inbounds for j in 1:size(C,2)
+    @inbounds for j in 1:size(B,2)
         Bk, stopBk = colstartind(B, j), colboundind(B, j)
         sort!(hinvrowvals, Bk, stopBk-1, QuickSort, Base.Order.Forward)
     end
 
-    spaceC::Int = min(length(rowvals(C)), length(nonzeros(C)))
-    rowsentinelA = convert(indtype(A), size(C,1) + 1)
-    rowsentinelB = convert(indtype(B), size(C,1) + 1)
     Ck = 1
     @inbounds for j in 1:size(C,2)
         bj = h[j]
@@ -49,6 +50,7 @@ function map_index_plus!(C::SparseMatrixCSC, A::SparseMatrixCSC, B::SparseMatrix
         #Bi = Bk < stopBk ? hinv[rowvals(B)[Bk]] : rowsentinelB
         Bi = Bk < stopBk ? hinvrowvals[Bk] : rowsentinelB
         while true
+            #println("j $j bj $bj Ak $Ak stopAk $stopAk Ai $Ai Bk $Bk stopBk $stopBk Bi $Bi Ck $Ck")
             if Ai == Bi
                 Ai == rowsentinelA && break # column complete
                 Cx, Ci::indtype(C) = 2, Ai
@@ -83,7 +85,6 @@ function map_index_plus!(C::SparseMatrixCSC, A::SparseMatrixCSC, B::SparseMatrix
     return C
 end
 
-
 function invperm!(b::AbstractVector, a::AbstractVector)
     # b = zero(a) # similar vector of zeros
     b .= 0
@@ -102,10 +103,15 @@ function map_index_aux(A::SparseMatrixCSC, B::SparseMatrixCSC)
     S = size(A)
     IT = promote_type(SparseArrays.indtype(A), SparseArrays.indtype(B))
     ET = promote_type(eltype(A), eltype(B))
-    C = SparseArrays.HigherOrderFns._allocres(S, IT, ET, nnz(A)+nnz(B))
+    
+    maxnnz = nnz(A)+nnz(B)
+    pointers = ones(IT, S[2] + 1)
+    storedinds = Vector{IT}(undef, maxnnz)
+    storedvals = Vector{ET}(undef, maxnnz)
+    C = SparseMatrixCSC(S..., pointers, storedinds, storedvals)    
 
     hinv = randperm(size(B,1))
-    hinvrowvals = similar(hinv, length(rowvals(C)))
+    hinvrowvals = similar(hinv, nnz(B))
 
     (C, hinv, hinvrowvals)
 end
@@ -186,12 +192,13 @@ end
     using GAFramework, GAFramework.NetalGA, GAFramework.PermGA
     using LightGraphs, SparseArrays
     using Random
-    #GAFramework.setthreads(false)
+    GAFramework.setthreads(false)
     mv = 100
     me = 400
-    G1 = adjacency_matrix(LightGraphs.erdos_renyi(mv,me))
+    G2 = adjacency_matrix(LightGraphs.erdos_renyi(mv,me))
     perm = randperm(mv)
-    G2 = G1[invperm(perm),invperm(perm)]
+    nv = 75
+    G1 = G2[perm,perm][1:nv,1:nv]
     model1 = NetalModel(G1,G2)
     model2 = NetalignModel(G1,G2)
     aux1 = genauxga(model1)
@@ -245,6 +252,7 @@ function NetalCreature(h, m::NetalModel, aux)
     w = nonzeros(K)
     Nc = count(x->x==2, w)
     Nn = count(x->x==1, w)
+
     Nc,cr = divrem(Nc,2)
     Nn,nr = divrem(Nn,2) # need this & above so it works well with sim. ann. code
     if cr!=0 || nr!=0 error("G1 and G2 need to be symmetric"); end
