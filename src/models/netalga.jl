@@ -131,13 +131,11 @@ module NetalGA
 using SparseArrays
 using Random
 using ..GAFramework
-import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature, genauxga
+import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature, genauxga, printfitness
+using ..CayleyCrossover
+using ..Spmap
 
 export NetalCreature, NetalModel
-
-import ..GAFramework.PermGA: CayleyCrossover, halfperm!, rdivperm!
-
-using ..Spmap
 
 # Represents a permutation, i.e. 1-1 mapping from one set to another
 struct NetalCreature
@@ -146,19 +144,6 @@ struct NetalCreature
 end
 
 fitness(x::NetalCreature) where {T} = x.score
-
-function crossover!(::CayleyCrossover, z::P, x::P, y::P,
-    st::GAState, aux, rng::AbstractRNG) where {P <: NetalCreature}
-    (_, (r, visited)) = aux
-    visited .= false
-    rdivperm!(r, x.f, y.f) # r = p q^-1
-    halfperm!(r, rng, visited)
-    # z.f[:] = r[y.f] # permute!(z.f, y.f) #
-    @inbounds for i in 1:length(r)
-        z.f[i] = r[y.f[i]]
-    end
-    NetalCreature(z.f, st.model, aux)
-end
 
 printfitness(curgen::Int, x::NetalCreature) =
     println("curgen: $curgen value: $(x.f) score: $(x.score)")
@@ -265,9 +250,11 @@ function randcreature(m::NetalModel, aux, rng::AbstractRNG) where {T}
     NetalCreature(f, m, aux)
 end
 
-function crossover!(z, x, y,
-    st::GAState{NetalModel}, aux, rng::AbstractRNG) where {T}
-    crossover!(CayleyCrossover(), z, x, y, st, aux, rng)
+function crossover!(z, x, y, st::GAState{NetalModel}, aux, rng::AbstractRNG) where {T}
+    (_, (r, visited)) = aux
+    visited .= false
+    cayley_crossover!(z.f, x.f, y.f, rng, r, visited)
+    NetalCreature(z.f, st.model, aux)
 end
 
 end # NetalGA

@@ -1,21 +1,8 @@
-module PermGA
-
-using SparseArrays
+module CayleyCrossover
 using Random
-using ..GAFramework
-import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature
 
-export PermCreature, NetalignModel
+export cayley_crossover!
 
-# Represents a permutation, i.e. 1-1 mapping from one set to another
-struct PermCreature
-    f :: Vector{Int}
-    score :: Float64 # alignment score
-end
-
-fitness(x::PermCreature) where {T} = x.score
-
-struct CayleyCrossover end
 # See MAGNA network alignment paper
 # for each cycle in permutation
 # cut off half off the cycle
@@ -59,17 +46,42 @@ function rdivperm!(r, p, q) # p q^-1
     end
     r
 end
-function crossover!(::CayleyCrossover, z::P, x::P, y::P,
-    st::GAState, aux, rng::AbstractRNG) where {P <: PermCreature}
-    rdivperm!(z.f, x.f, y.f) # r = p q^-1
-    halfperm!(z.f, rng)
-    z.f[:] = z.f[y.f] # permute!(z.f, y.f) # 
-    PermCreature(z.f, st.model)
+
+function cayley_crossover!(s::AbstractVector, p::AbstractVector, q::AbstractVector,
+    rng::AbstractRNG,
+    r::AbstractVector=similar(s),
+    visited::AbstractVector=fill(false, length(s)))
+    rdivperm!(r, p, q) # r = p q^-1
+    halfperm!(r, rng, visited)
+    # s[:] = r[q] # permute!(z, q) #
+    @inbounds for i in 1:length(r)
+        s[i] = r[q[i]]
+    end
+    s
 end
+
+end
+
+module PermGA
+
+using SparseArrays
+using Random
+using ..GAFramework
+import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature, printfitness
+using ..CayleyCrossover
+
+export PermCreature, NetalignModel
+
+# Represents a permutation, i.e. 1-1 mapping from one set to another
+struct PermCreature
+    f :: Vector{Int}
+    score :: Float64 # alignment score
+end
+
+fitness(x::PermCreature) where {T} = x.score
 
 printfitness(curgen::Int, x::PermCreature) =
     println("curgen: $curgen value: $(x.f) score: $(x.score)")
-
 
 """
 Model to find network alignment by optimizing S3 (see MAGNA paper)
@@ -131,7 +143,8 @@ end
 
 function crossover!(z, x, y,
     st::GAState{NetalignModel}, aux, rng::AbstractRNG) where {T}
-    crossover!(CayleyCrossover(), z, x, y, st, aux, rng)
+    cayley_crossover!(z.f, x.f, y.f, rng)
+    PermCreature(z.f, st.model)
 end
 
 end # PermGA

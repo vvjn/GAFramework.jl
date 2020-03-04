@@ -3,14 +3,11 @@ module MagnaGA
 using SparseArrays
 using Random
 using ..GAFramework
-import ..GAFramework: fitness, crossover!, mutation!, selection
-import ..GAFramework: randcreature, genauxga, printfitness
+import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature, genauxga, printfitness
+using ..CayleyCrossover
+using ..Spmap
 
 export MagnaCreature, MagnaModel
-
-import ..GAFramework.PermGA: CayleyCrossover, halfperm!, rdivperm!
-
-using ..Spmap
 
 # Represents a permutation, i.e. 1-1 mapping from one set to another
 struct MagnaCreature
@@ -21,35 +18,6 @@ struct MagnaCreature
 end
 
 fitness(x::MagnaCreature) where {T} = x.score
-
-function cayley_crossover(s::AbstractVector, p::AbstractVector, q::AbstractVector,
-    rng::AbstractRNG,
-    r::AbstractVector=similar(z),
-    visited::AbstractVector=fill(false, length(z)))
-    rdivperm!(r, p, q) # r = p q^-1
-    halfperm!(r, rng, visited)
-    # s[:] = r[q] # permute!(z, q) #
-    @inbounds for i in 1:length(r)
-        s[i] = r[q[i]]
-    end
-    s
-end
-
-function crossover!(::CayleyCrossover, z::P, x::P, y::P,
-    st::GAState, aux, rng::AbstractRNG) where {P <: MagnaCreature}
-    (_, (r, visited)) = aux
-    visited .= false
-    rdivperm!(r, x.f, y.f) # r = p q^-1
-    halfperm!(r, rng, visited)
-    # z.f[:] = r[y.f] # permute!(z.f, y.f) #
-    @inbounds for i in 1:length(r)
-        z.f[i] = r[y.f[i]]
-    end
-    MagnaCreature(z.f, st.model, aux)
-end
-
-printfitness(curgen::Int, x::MagnaCreature) =
-    println("curgen: $curgen value: $(x.f) score: $(x.score)")
 
 """
 Model to find network alignment by optimizing S3 (see MAGNA paper)
@@ -159,9 +127,11 @@ function randcreature(m::MagnaModel, aux, rng::AbstractRNG) where {T}
     MagnaCreature(f, m, aux)
 end
 
-function crossover!(z, x, y,
-    st::GAState{MagnaModel}, aux, rng::AbstractRNG) where {T}
-    crossover!(CayleyCrossover(), z, x, y, st, aux, rng)
+function crossover!(z, x, y, st::GAState{MagnaModel}, aux, rng::AbstractRNG) where {T}
+    (_, (r, visited)) = aux
+    visited .= false
+    cayley_crossover!(z.f, x.f, y.f, rng, r, visited)
+    MagnaCreature(z.f, st.model, aux)
 end
 
 function printfitness(curgen::Int, x::MagnaCreature)

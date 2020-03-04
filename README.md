@@ -24,7 +24,7 @@ space.
 
 ## Installation
 
-`Pkg.add("GAFramework")`
+`using Pkg; Pkg.add("GAFramework")`
 
 ## Implementing a GA for a specific problem
 
