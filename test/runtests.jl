@@ -87,9 +87,9 @@ function test6()
     best.f[1:7] == f[1:7]
 end
 
+@test test5()
 @test test6()
 @test test1()
 @test test2()
 @test test3()
 @test test4()
-@test test5()

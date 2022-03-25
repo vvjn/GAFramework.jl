@@ -103,11 +103,12 @@ function map_index_aux(A::SparseMatrixCSC, B::SparseMatrixCSC)
     S = size(A)
     IT = promote_type(SparseArrays.indtype(A), SparseArrays.indtype(B))
     ET = promote_type(eltype(A), eltype(B))
-    
-    maxnnz = nnz(A)+nnz(B)
+
+    maxnnz = min(prod(S), nnz(A)+nnz(B))
     pointers = ones(IT, S[2] + 1)
-    storedinds = Vector{IT}(undef, maxnnz)
-    storedvals = Vector{ET}(undef, maxnnz)
+    pointers[end] = maxnnz + 1
+    storedinds = ones(IT, maxnnz)
+    storedvals = ones(ET, maxnnz)
     C = SparseMatrixCSC(S..., pointers, storedinds, storedvals)    
 
     hinv = randperm(size(B,1))
