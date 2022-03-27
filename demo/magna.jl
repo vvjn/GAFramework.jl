@@ -73,7 +73,12 @@ function main()
             M = readdlm(sim,',',String,'\n')
             I = indexin(M[:,1], verts1); J = indexin(M[:,2], verts2)
             V = parse.(Float64, M[:,3])
-            Array(sparse(I,J,V,length(verts1), length(verts2)))
+            A = sparse(I,J,V,length(verts1), length(verts2))
+            if nnz(A) > prod(size(A))/5
+                Array(A)
+            else
+                A
+            end
         end
     else
         S,_ = readdlm(sim, header=true)

@@ -5,7 +5,8 @@ using LinearAlgebra: dot
 using ..GAFramework
 import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature
 
-export CoordinateCreature, FunctionModel, SumModel
+export CoordinateCreature, FunctionModel, SumModel,
+    AverageCrossover, SinglePointCrossover, TwoPointCrossover
 
 # This is a CoordinateCreature, T is some coordinate type like Vector
 # and objvalue is some objective value
@@ -67,49 +68,7 @@ end
 printfitness(curgen::Int, x::CoordinateCreature{T}) where {T} =
     println("curgen: $curgen value: $(x.value) obj. value: $(x.objvalue)")
 
-
-# The following is the SumModel
-# It finds a d-dimensional coordinate x such that dot(x, 1:length(x)) ≈ y
-"""
-    model = SumModel(5, 42.)
-    state = GAState(model, ngen=500, npop=6_000, elite_fraction=0.1,
-                       params=Dict(:mutation_rate=>0.9, :print_fitness_iter=>1))
-    ga!(state)
-"""
-struct SumModel{T} <: GAModel
-    d::Int
-    target::T
-end
-
-function CoordinateCreature(value::Vector{T}, m::SumModel{T}) where {T}
-    objval = Float64(abs(dot(value, 1:length(value)) - m.target))
-    CoordinateCreature(value, objval)
-end
-
-function randcreature(m::SumModel{T}, aux, rng::AbstractRNG) where {T}
-    value = rand(rng, m.d)
-    CoordinateCreature(value, m)
-end
-
-function mutation!(x::CoordinateCreature,
-    st::GAState{SumModel{T}}, aux, rng::AbstractRNG) where {T}
-    gp = st.params
-    if rand(rng) < get(gp, :mutation_rate, 0.1)
-        x.value[rand(rng, 1:length(x.value))] += st.model.target * randn(rng,T)
-        CoordinateCreature(x.value, st.model)
-    else
-        x
-    end
-end
-
-function crossover!(z::CoordinateCreature,
-    x::CoordinateCreature, y::CoordinateCreature,
-    st::GAState{SumModel{T}}, aux, rng::AbstractRNG) where {T}
-    crossover!(TwoPointCrossover(), z, x, y, st, aux, rng)
-end
-
 # The following is the FunctionModel
-# It's a more complicated model than above
 # It minimizes the objective value using a given objective function
 """
 # E.g.
@@ -163,7 +122,8 @@ end
 function crossover!(z::CoordinateCreature{T},
     x::CoordinateCreature{T}, y::CoordinateCreature{T},
     st::GAState{FunctionModel{F,T}}, aux, rng::AbstractRNG) where {F,T}
-    crossover!(TwoPointCrossover(), z, x, y, st, aux, rng)
+    gp = st.params
+    crossover!(get(gp, :crossover, TwoPointCrossover()), z, x, y, st, aux, rng)
 end
 
 # Mutate over all dimensions

@@ -43,9 +43,9 @@ Faster implementation
 struct MagnaModel <: GAModel
     G1   :: SparseMatrixCSC{Int,Int}
     G2   :: SparseMatrixCSC{Int,Int}
-    S :: Matrix{Float64}
+    S :: AbstractMatrix
     alpha :: Float64
-    function MagnaModel(G1::SparseMatrixCSC,G2::SparseMatrixCSC,S::Matrix,alpha::Number)
+    function MagnaModel(G1::SparseMatrixCSC,G2::SparseMatrixCSC,S::AbstractMatrix,alpha::Number)
         (size(G1,1)==size(G1,2) && size(G2,1)==size(G2,1) &&
             size(S,1)==size(G1,1) && size(S,2)==size(G2,1)) || error("input sizes")
         new(G1,G2,S,alpha)
@@ -90,7 +90,7 @@ function genauxga(m::MagnaModel)
     n1 = size(m.G1, 1)
     n2 = size(m.G2, 1)
     finv = randperm(n2)
-    v_store = zeros(Int, n1+n2)
+    v_store = zeros(Int, 2*n1)
     v_count = zeros(Int, n1)
     model_aux = (finv, v_store, v_count)
 
@@ -103,17 +103,16 @@ function calculate_s3(G1, G2, f, aux=nothing)
     n2 = size(G2,1)
 
     if isnothing(aux)
-        finv = randperm(n2)
-        v_store = zeros(Int, n1+n2)
+        finv = invperm(n2)
+        v_store = zeros(Int, 2*n1)
         v_count = zeros(Int, n1)
     else
         ((finv, v_store, v_count), ) = aux
+        @inbounds for j in 1:n2
+            finv[f[j]] = j
+        end
     end
     
-    @inbounds for j in 1:n2
-        finv[f[j]] = j
-    end
-
     rows1 = rowvals(G1)
     rows2 = rowvals(G2)
     # Map G2 back onto G1 axes and count edges
