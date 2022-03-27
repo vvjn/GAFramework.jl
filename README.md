@@ -1,6 +1,7 @@
 # GAFramework: a genetic algorithm framework with multi-threading
 
-[![Build Status](https://travis-ci.org/vvjn/GAFramework.jl.svg?branch=master)](https://travis-ci.org/vvjn/GAFramework.jl) [![codecov.io](http://codecov.io/github/vvjn/GAFramework.jl/coverage.svg?branch=master)](http://codecov.io/github/vvjn/GAFramework.jl?branch=master)
+[![CI](https://github.com/vvjn/GAFramework.jl/workflows/CI/badge.svg)](https://github.com/vvjn/GAFramework.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/vvjn/GAFramework.jl/branch/master/graph/badge.svg?token=H7vovR1C9z)](https://codecov.io/gh/vvjn/GAFramework.jl)
 
 GAFramework is a framework for writing genetic algorithms in Julia. It
 supports parallelism by calculating crossovers and fitness using

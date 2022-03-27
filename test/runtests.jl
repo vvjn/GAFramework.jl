@@ -5,7 +5,6 @@ using SparseArrays
 using GAFramework
 using GAFramework.CoordinateGA
 using GAFramework.PermGA
-using GAFramework.NetalGA
 using GAFramework.MagnaGA
 
 function test1()
@@ -49,30 +48,19 @@ end
 function test4()
     rows = [3, 4, 5, 7, 9, 3, 7, 8, 9, 10, 1, 2, 6, 7, 8, 1, 6, 1, 6, 7, 9, 10, 3, 4, 5, 8, 1, 2, 3, 5, 9, 2, 3, 6, 1, 2, 5, 7, 2, 5]
     cols = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 9, 10, 10]
-    G1 = sparse(rows, cols, ones(length(rows)))
-    perm = [3, 2, 4, 8, 6, 1, 5, 10, 9, 7]
-    G2 = G1[invperm(perm),invperm(perm)]
-    model = NetalignModel(G1,G2)
+    G2 = sparse(rows, cols, ones(length(rows)))
+    f = [3, 2, 4, 8, 6, 1, 5, 10, 9, 7]
+    G1 = G2[f[1:7],f[1:7]]
+    S = rand(7,10)/10
+    for i in 1:7 S[i,f[i]] = 1.0 end
+    model = NetalignModel(G1,G2,S,0.5)
     st = GAState(model, ngen=100, npop=6_000, elite_fraction=0.1,
         params = Dict(:print_fitness_iter=>20))
     best = ga!(st)
-    fitness(best) == 1
+    best.f[1:7] == f[1:7]
 end
 
 function test5()
-    rows = [3, 4, 5, 7, 9, 3, 7, 8, 9, 10, 1, 2, 6, 7, 8, 1, 6, 1, 6, 7, 9, 10, 3, 4, 5, 8, 1, 2, 3, 5, 9, 2, 3, 6, 1, 2, 5, 7, 2, 5]
-    cols = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 9, 10, 10]
-    G1 = sparse(rows, cols, ones(length(rows)))
-    perm = [3, 2, 4, 8, 6, 1, 5, 10, 9, 7]
-    G2 = G1[invperm(perm),invperm(perm)]
-    model = NetalModel(G1,G2)
-    st = GAState(model, ngen=100, npop=6_000, elite_fraction=0.1,
-        params = Dict(:print_fitness_iter=>20))
-    best = ga!(st)
-    fitness(best) == 1
-end
-
-function test6()
     rows = [3, 4, 5, 7, 9, 3, 7, 8, 9, 10, 1, 2, 6, 7, 8, 1, 6, 1, 6, 7, 9, 10, 3, 4, 5, 8, 1, 2, 3, 5, 9, 2, 3, 6, 1, 2, 5, 7, 2, 5]
     cols = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 9, 10, 10]
     G2 = sparse(rows, cols, ones(length(rows)))
@@ -87,9 +75,8 @@ function test6()
     best.f[1:7] == f[1:7]
 end
 
+@test test4()
 @test test5()
-@test test6()
 @test test1()
 @test test2()
 @test test3()
-@test test4()

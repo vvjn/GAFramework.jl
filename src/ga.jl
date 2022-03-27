@@ -1,27 +1,5 @@
 import Future
 
-dothreads = Threads.nthreads() > 1
-
-function setthreads(p::Bool)
-    global dothreads = p
-end
-
-macro threads(ex)
-    if ex.head === :for
-        ret = quote
-            global dothreads
-            if dothreads
-                Threads.@threads($ex)
-            else
-                $ex
-            end
-        end
-        esc(ret)
-    else
-        throw(ArgumentError("unrecognized argument to @threads"))
-    end
-end
-
 """
 Creates initial population as well as auxiliary structures for GA.
 """
@@ -37,7 +15,7 @@ function initializepop(model::GAModel, npop::Integer,
         pop1 = randcreature(model, aux[1], rngs[1])
         pop = Vector{typeof(pop1)}(undef, npop)
         pop[1] = pop1
-        @threads for i = 2:npop
+        Threads.@threads for i = 2:npop
             threadid = Threads.threadid()
             pop[i] = randcreature(model, aux[threadid], rngs[threadid])
         end
@@ -121,7 +99,7 @@ function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
     # 3. mutate population
     # 5. sort population
     parents = selection(st.pop, nchildren, st, it.rngs[1])
-    @threads for i = 1:nchildren
+    Threads.@threads for i = 1:nchildren
         threadid = Threads.threadid()
         p1,p2 = parents[i]
         it.children[i] = crossover!(it.children[i], st.pop[p1], st.pop[p2], st,
@@ -137,7 +115,7 @@ function Base.iterate(it::GAIterable, iteration::Int=it.state.curgen)
 
     # mutate pop, including elites (except for the most elite creature,
     # so that monotonocity of best fitness wrt generation number is preserved)
-    @threads for i = 2:length(st.pop)
+    Threads.@threads for i = 2:length(st.pop)
         threadid = Threads.threadid()
         st.pop[i] = mutation!(st.pop[i], st, it.aux[threadid], it.rngs[threadid])
     end

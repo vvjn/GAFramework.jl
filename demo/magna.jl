@@ -1,5 +1,5 @@
 using GAFramework, GAFramework.MagnaGA
-using LightGraphs, SparseArrays
+using SparseArrays
 using Random
 using Statistics
 using DelimitedFiles
@@ -63,10 +63,21 @@ function main()
     elite_fraction = parse(Float64, ARGS[7])
     out = ARGS[8]
 
+    println("Reading network files")
     G1,verts1 = readgw(n1)
     G2,verts2 = readgw(n2)
 
-    S,_ = readdlm(sim, header=true)
+    println("Reading sim file")
+    if endswith(sim, ".csv")
+        S = let
+            M = readdlm(sim,',',String,'\n')
+            I = indexin(M[:,1], verts1); J = indexin(M[:,2], verts2)
+            V = parse.(Float64, M[:,3])
+            Array(sparse(I,J,V,length(verts1), length(verts2)))
+        end
+    else
+        S,_ = readdlm(sim, header=true)
+    end
 
     model = MagnaModel(G1,G2,S,alpha)
     st = GAState(model, ngen=2, npop=2, elite_fraction=0.5)

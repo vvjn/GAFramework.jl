@@ -137,7 +137,6 @@ include("selections.jl")
 
 include("models/coordinatega.jl")
 include("models/permga.jl")
-include("models/netalga.jl")
 include("models/magnaga.jl")
 
 function logiteration(st::GAState)
