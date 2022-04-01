@@ -3,7 +3,6 @@ using SparseArrays
 using Random
 using Statistics
 using DelimitedFiles
-#GAFramework.setthreads(false)
 
 """
 Return line after skipping if pred(line) is true

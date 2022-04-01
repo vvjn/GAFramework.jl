@@ -103,7 +103,7 @@ function calculate_s3(G1, G2, f, aux=nothing)
     n2 = size(G2,1)
 
     if isnothing(aux)
-        finv = invperm(n2)
+        finv = invperm(f)
         v_store = zeros(Int, 2*n1)
         v_count = zeros(Int, n1)
     else
@@ -112,12 +112,12 @@ function calculate_s3(G1, G2, f, aux=nothing)
             finv[f[j]] = j
         end
     end
-    
+
     rows1 = rowvals(G1)
     rows2 = rowvals(G2)
     # Map G2 back onto G1 axes and count edges
-    n_induced = 0
     n_conserved = 0
+    n_nonconserved = 0
     @inbounds for u1 in 1:n1
         # Accumulate the edges that are mapped back
         r = 1
@@ -133,7 +133,6 @@ function calculate_s3(G1, G2, f, aux=nothing)
             if v1 <= n1
                 v_store[r] = v1
                 r += 1
-                n_induced += 1
             end
         end
         n_neighbors = r-1
@@ -146,13 +145,12 @@ function calculate_s3(G1, G2, f, aux=nothing)
         end
         for r in 1:n_neighbors
             i = v_store[r]
-            if v_count[i] == 2
-                n_conserved += 1
-                v_count[i] = 0
-            end
+            c = v_count[i]
+            n_conserved += Int(c == 2)
+            n_nonconserved += Int(c == 1)
+            v_count[i] = 0
         end
     end
-    n_nonconserved = nnz(G1) + n_induced - 2n_conserved
     edge_score = n_conserved / (n_nonconserved + n_conserved)
     return n_conserved, n_nonconserved, edge_score
 end

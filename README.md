@@ -29,9 +29,8 @@ space.
 
 ## Implementing a GA for a specific problem
 
-To create a GA for a specific problem, we need to create concrete
-sub-types of the abstract types `GAModel` and `GACreature`, and then
-create relevant functions for the sub-types.
+To create a GA for a specific problem, we need to create a concrete
+sub-type of `GAModel`, and then create relevant functions for the sub-types.
 
 To demonstrate this, we create a GA for optimizing a function over a box in a
 Coordinate space, i.e., a function `f : R^n -> R`.
@@ -42,7 +41,7 @@ functions.
 ```julia
 using GAFramework
 import GAFramework: fitness, genauxga, crossover!, mutation!, selection,
-randcreature,printfitness, savecreature
+randcreature, printfitness, savecreature
 ```
 
 Next, we create a sub-type of `GAModel`, which contains the function
@@ -53,7 +52,7 @@ box, so that our solutions will be inside the box;
 otherwise, our solutions will not be constrained.
 
 ```julia
-struct CoordinateModel{F,T} <: GAModel
+struct FunctionModel{F,T} <: GAModel
     f::F
     xmin::T
     xmax::T
@@ -61,33 +60,32 @@ struct CoordinateModel{F,T} <: GAModel
     clamp::Bool
 end
 
-function CoordinateModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
+function FunctionModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
         xspan = xmax .- xmin
-    CoordinateModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
+    FunctionModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
 end
 ```
 
-Then, we create a sub-type of `GACreature`, which contains the
+Then, we create a type, which contains the
 "chromosomes" of the creature (`value` field) and the objective value of the
 function (`objvalue` field). We calculate the objective value when creating a
 `CoordinateCreature{T}` object.
 
 ```julia
-struct CoordinateCreature{T} <: GACreature
+struct CoordinateCreature{T}
     value :: T
     objvalue :: Float64
 end
 
-CoordinateCreature(value::T, model::CoordinateModel{F,T}) where {F,T} =
+CoordinateCreature(value::T, model::FunctionModel{F,T}) where {F,T} =
     CoordinateCreature{T}(value, model.f(value))
 ```
 
+Genetic algorithms maximize the `fitness` function.
 Since we are minimizing the objective value, we set `fitness` to be
 negative of the objective value. Depending on the selection function
-used, `fitness(::GACreature)` might need to be non-negative, be a
-probability value, etc. But in general, you would want this function to be
-at the very least monotonic with respect to `objvalue`. A further
-note: the bulk of the calculation should be relegated to when the
+used, `fitness(::CoordinateCreature)` might need to be non-negative, be a
+probability value, etc. The bulk of the calculation should be relegated to when the
 `CoordinateCreature{T}` object is created; the `fitness` function
 below, since it will be repeatedly called during selection and
 sorting, should be a very fast and simple function such as identity or negation.
@@ -100,12 +98,12 @@ The following creates a randomly generated `CoordinateCreature`
 object. It creates a random point drawn with uniform probability
 from the box. Note: `aux` is used to store auxiliary scratch space in
 case we want to minimize memory allocations. `aux` can be created by
-overloading the `genauxga(model::CoordinateModel)` function, which is
+overloading the `genauxga(model::FunctionModel)` function, which is
 used to produce memory-safe (with respect to multi-threading) auxiliary scratch
 space. In this example, we do not need any scratch space.
 
 ```julia
-randcreature(m::CoordinateModel{F,T}, aux, rng) where {F,T} =
+randcreature(m::FunctionModel{F,T}, aux, rng::AbstractRNG) where {F,T} =
     CoordinateCreature(m.xmin .+ m.xspan .* rand(rng,length(m.xspan)), m)
 ```
 
@@ -116,11 +114,11 @@ the new `CoordinateCreature`.
 
 ```julia
 function crossover!(z::CoordinateCreature{T}, x::CoordinateCreature{T},
-                   y::CoordinateCreature{T}, m::CoordinateModel{F,T},
-                   params, curgen, aux, rng) where {F,T}
+                   y::CoordinateCreature{T}, st::GAState,
+                   aux, rng::AbstractRNG) where {T}
               z.value[:] = 0.5 .* (x.value .+ y.value)
-              CoordinateCreature(z.value, m)
-end              
+              CoordinateCreature(z.value, st.model)
+end
 ```
 
 The following defines the mutation operator. We draw a vector from a
@@ -130,9 +128,9 @@ operator).  Clamping is optionally done to restrict points to be
 inside the box.
 
 ```julia
-function mutation!(x::CoordinateCreature{T}, m::CoordinateModel{F,T},
+function mutation!(x::CoordinateCreature{T}, m::FunctionModel{F,T},
                 params, curgen, aux, rng) where {F,T}
-    if rand(rng) < params[:rate]            
+    if rand(rng) < params[:rate]
         x.value .+= 0.01 .* m.xspan .* randn(rng,length(x.value))
         if m.clamp
             x.value .= clamp.(x.value, m.xmin, m.xmax)
@@ -163,21 +161,84 @@ the best creature to file using this function.
 
 ```julia
 savecreature(file_name_prefix::AbstractString, curgen::Integer,
-             creature::CoordinateCreature, model::CoordinateModel) =
+             creature::CoordinateCreature, model::FunctionModel) =
     save("$(file_name_prefix)_creature_$(curgen).jld", "creature", creature)
 ```
+
+In summary, we can implement a new GA using the following code.
+
+```julia
+module CoordinateGA
+
+using GAFramework
+import GAFramework: fitness, crossover!, mutation!, selection, randcreature
+using Random
+
+struct FunctionModel{F,T} <: GAModel
+    f::F
+    xmin::T
+    xmax::T
+    xspan::T # xmax-xmin
+    clamp::Bool
+end
+
+function FunctionModel(f::F,xmin,xmax,clamp::Bool=true) where {F}
+        xspan = xmax .- xmin
+    FunctionModel{F,typeof(xspan)}(f,xmin,xmax,xspan,clamp)
+end
+
+struct CoordinateCreature{T}
+    value :: T
+    objvalue :: Float64
+end
+
+CoordinateCreature(value::T, model::FunctionModel{F,T}) where {F,T} =
+    CoordinateCreature{T}(value, model.f(value))
+
+fitness(x::CoordinateCreature) = -x.objvalue
+
+randcreature(m::FunctionModel{F,T}, aux, rng::AbstractRNG) where {F,T} =
+    CoordinateCreature(m.xmin .+ m.xspan .* rand(rng,length(m.xspan)), m)
+
+function crossover!(z::CoordinateCreature{T}, x::CoordinateCreature{T},
+                   y::CoordinateCreature{T}, st::GAState,
+                   aux, rng::AbstractRNG) where {T}
+              z.value[:] = 0.5 .* (x.value .+ y.value)
+              CoordinateCreature(z.value, st.model)
+end
+
+function mutation!(x::CoordinateCreature{T}, m::FunctionModel{F,T},
+                params, curgen, aux, rng) where {F,T}
+    if rand(rng) < params[:rate]
+        x.value .+= 0.01 .* m.xspan .* randn(rng,length(x.value))
+        if m.clamp
+            x.value .= clamp.(x.value, m.xmin, m.xmax)
+        end
+        CoordinateCreature(x.value, m)
+    else
+        x
+    end
+end
+
+selection(pop::Vector{<:CoordinateCreature}, n::Integer, rng) =
+    selection(TournamentSelection(2), pop, n, rng)
+
+end
+```
+A variation of this GA is in `src/models/coordinatega.jl`. Further examples are in `src/models/permga.jl` and `src/models/magnaga.jl`.
+
 
 ## Running the GA
 
 That takes care of how to implement our problem using
 `GAFramework`. Now, we define our problem by creating a
-`CoordinateModel`.
+`FunctionModel`.
 
 For fun, we want to minimize the function `x sin(1/x)` over the
 `[-1,1]` interval.
 
 ```julia
-model = CoordinateModel(x -> x[1]==0 ? 0.0 : x[1] * sin(1/x[1]), [-1.0], [1.0])
+model = FunctionModel(x -> x[1]==0 ? 0.0 : x[1] * sin(1/x[1]), [-1.0], [1.0])
 ```
 
 Or, we want to minimize the function `<x, sin(1/x)>` in 2D
@@ -186,7 +247,7 @@ Euclidean space over the `[-1,1]^2` rectangle.
 ```julia
 using LinearAlgebra
 
-model = CoordinateModel(x -> any(x.==0) ? 0.0 : dot(x, sin.(1./x)),
+model = FunctionModel(x -> any(x.==0) ? 0.0 : dot(x, sin.(1./x)),
                          [-1.,-1.], [1.,1.])
 ```
 
@@ -197,7 +258,7 @@ Or, we want to minimize the function `|x - (0.25,0.25,0.5,0.5,0.5)|_1` in
 using LinearAlgebra
 
 x0 = [0.25,0.25,0.5,0.5,0.5]
-model = CoordinateModel(x -> norm(x-x0,1),
+model = FunctionModel(x -> norm(x-x0,1),
                          [-1.,-1.,-1.,-1.,-1], # minimum corner
                          [1.,1.,1.,1.,1]) # maximum corner in box
 ```
@@ -225,7 +286,7 @@ ga!(state)
 
 `state.pop[1]` gives you the creature with the best fitness.
 
-A version of `CoordinateModel` and `CoordinateCreature` are included `GAFramework`. It can be used by executing the statement `using GAFramework.CoordinateGA`.
+A version of `FunctionModel` and `CoordinateCreature` are included `GAFramework`. It can be used by executing the statement `using GAFramework.CoordinateGA`.
 
 ## Restarting
 
@@ -244,7 +305,7 @@ ga!(state)
 
 Although `GAFramework` uses pseudo-random numbers for many operations, we
 can replicate a GA run using the `rng` option and by using only the random number
-generators provided by the functions to generate random numbers. Setting `rng` to be an 
+generators provided by the functions to generate random numbers. Setting `rng` to be an
 object that is a sub-type of `AbstractRNG`
 will percolate it throughout the GA, allowing us to replicate a run. By default, `rng` is
 set to `MersenneTwister(rand(UInt))`.
@@ -287,7 +348,7 @@ savecreature("minexp_6000", state.ngen, state.pop[1], model)
 
 This save the full GA state to file every 100 iterations using the
 following. Note: unfortunately, this doesn't work with
-`CoordinateModel{F,T}` since it contains the function `f::F` as a field. It should
+`FunctionModel{F,T}` since it contains the function `f::F` as a field. It should
 work for other types that do not contain functions.
 
 ```julia

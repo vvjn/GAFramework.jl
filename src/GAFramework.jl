@@ -69,7 +69,7 @@ scratch space or to create the child. aux is more scratch space. rng is random n
     child = crossover(z,x,y,model,aux,rng)
 """
 crossover!(z, x, y, st::GAState, aux, rng::AbstractRNG) =
-    error("crossover not implemented for $(typeof(z)) and $(typeof(st.model))")
+    error("crossover not implemented for $(typeof(z))")
 
 """
     Mutates a incoming creature and outputs mutated creature

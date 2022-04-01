@@ -1,9 +1,8 @@
 module CoordinateGA
 
-using Random
-using LinearAlgebra: dot
 using ..GAFramework
 import ..GAFramework: fitness, crossover!, mutation!, selection, randcreature
+using Random
 
 export CoordinateCreature, FunctionModel, SumModel,
     AverageCrossover, SinglePointCrossover, TwoPointCrossover
